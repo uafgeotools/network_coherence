@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib as mpl
-import colorcet
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.dates as dates

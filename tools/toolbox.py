@@ -1,4 +1,4 @@
-from classes.time_frequency_dataclass import DataBin
+from classes.network_coherence_dataclass import DataBin
 import os
 import threading
 from obspy.geodetics import gps2dist_azimuth

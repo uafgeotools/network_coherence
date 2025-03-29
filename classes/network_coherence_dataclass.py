@@ -2,7 +2,7 @@ import numpy as np
 from scipy.fft import rfftfreq
 
 class DataBin:
-    """DataBin class for windowing information for time-frequency analysis"""
+    """DataBin class for windowing information for time-frequency analysis and plotting"""
     def __init__(self, window_length, window_overlap):
         self.window_length = window_length
         self.window_overlap = window_overlap
