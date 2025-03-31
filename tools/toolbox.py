@@ -1,5 +1,6 @@
 from classes.network_coherence_dataclass import DataBin
 import os
+import warnings
 import threading
 from obspy.geodetics import gps2dist_azimuth
 import time
@@ -114,6 +115,7 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
                                    fs=data.sampling_rate, window=data.window,
                                    nperseg=data.sub_window, noverlap=data.noverlap)
                 Cxy2_list.append(Cxy2)
+
         global progress_counter
         progress_counter.value += 1  # increment progress counter
 
@@ -129,6 +131,7 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         monitor_thread.start()
         results = pool.map(compute_interval_median_Cxy2, range(data.nits))
         monitor_thread.join()
+        print("Coherence processing: 100% complete")
 
     Cxy2_norm = np.array(results).T  # transpose to have time on the x-axis
 
@@ -152,3 +155,49 @@ def monitor_progress(total_tasks, progress_counter):
                     return
                 break
         time.sleep(1)
+
+def get_interstation_coherograms(st, data, n_jobs=1):
+
+    if data.n_weeks > 1:  # not sure whether to implement yet, need to test
+        warnings.warn("Runtime may be slow for long datasets. Consider reducing time period to 1 week or less.")
+
+    progress_counter = mp.Value('i', 0)  # initialize counter for progress tracking
+
+    # function to compute inter-station coherence for a single station pair
+    def compute_interstation_Cxy2(args):
+        i, j = args
+        Cxy2_list = []
+
+        for jj in range(data.nits):
+            t0_ind = data.intervals[jj]
+            tf_ind = data.intervals[jj] + data.winlensamp
+
+            _, Cxy2 = coherence(st[i].data[t0_ind:tf_ind], st[j].data[t0_ind:tf_ind],
+                                fs=data.sampling_rate, window=data.window,
+                                nperseg=data.sub_window, noverlap=data.noverlap)
+            Cxy2_list.append(Cxy2)
+
+        Cxy2_array = np.array(Cxy2_list).T
+        station_pair = (st[i].stats.station, st[j].stats.station)
+
+        global progress_counter
+        progress_counter.value += 1  # increment progress counter
+
+        return (station_pair, Cxy2_array)
+
+    if n_jobs > os.cpu_count():  # ensure n_jobs is not greater than the number of available cores
+        n_jobs = os.cpu_count()
+
+    N = len(st)
+    tasks = [(i, j) for i in range(N) for j in range(i + 1, N)]  # all unique station pairs
+    nPairs = len(tasks)  # determine number of unique station pairs
+    # start parallel processing
+    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(progress_counter,)) as pool:
+        monitor_thread = threading.Thread(target=monitor_progress, args=(nPairs, progress_counter))
+        monitor_thread.start()
+        results = pool.map(compute_interstation_Cxy2, tasks)
+        monitor_thread.join()
+        print("Coherence processing: 100% complete")
+    coherograms = {pair: Cxy2 for pair, Cxy2 in results}
+
+    return coherograms

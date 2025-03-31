@@ -1,4 +1,5 @@
 import numpy as np
+from obspy.geodetics import gps2dist_azimuth
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
@@ -66,3 +67,80 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
     plt.show()
 
     return fig, axs
+
+
+def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
+
+    station_distances = []
+    for tr in st:
+        # find distance from source to each station
+        dist_m, _, _ = gps2dist_azimuth(data.source_lat, data.source_lon, tr.stats.latitude, tr.stats.longitude)
+        station_distances.append((tr.stats.station, dist_m))  # store station name and distance
+
+    stations_sorted_asc = sorted(station_distances, key=lambda x: x[1])  # sort stations by distance
+
+    N = len(stations_sorted_asc)
+
+    colorm = LinearSegmentedColormap.from_list('', ['white', *plt.get_cmap('magma_r').colors])
+    c_lim = [0.4, 1.0]
+
+    fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
+    plt.subplots_adjust(hspace=0.05, wspace=0.05)
+
+    for i in range(1, N):  # loop over rows (remove top row)
+        for j in range(N - 1):  # loop over columns (remove rightmost column)
+
+            ax = axs[i - 1, j]  # select correct axis
+            station_y = stations_sorted_asc[i][0]
+            station_x = stations_sorted_asc[j][0]
+
+            if i <= j:  # remove upper triangular panels
+                ax.set_frame_on(False)
+                ax.axis('off')
+                continue
+
+            # find the coherogram for this particular station pair
+            if (station_y, station_x) in coherograms:
+                coherogram = coherograms[(station_y, station_x)]
+            elif (station_x, station_y) in coherograms:
+                coherogram = coherograms[(station_x, station_y)]
+
+            # plot the coherogram
+            mesh = ax.pcolormesh(data.t, data.freq_vector, coherogram, shading='auto', cmap=colorm)
+            mesh.set_clim(c_lim)
+            ax.set_ylim(data.freq_min, data.freq_max)
+            ax.set_xticks([])
+
+            if j == 0:  # set y-axis labels only on far left panels
+                ax.set_ylabel(station_y, fontweight='bold')
+            else:
+                ax.set_yticks([])
+
+            if i == N - 1:  # set x-axis labels for bottom row only
+                ax.set_xlabel(station_x, fontweight='bold')
+
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(mesh, cax=cbar_ax)  # add colorbar
+    cbar.set_label("Mag$^2$ Coherence")
+
+    # add overarching x axis label
+    fig.text(0.5, 0.05, f'Increasing distance from {data.source_name} --------------->',
+             ha='center', va='center', fontsize=14)
+    # add overarching y axis label
+    fig.text(0.05, 0.5, f'<--------------- Increasing distance from {data.source_name}',
+             ha='center', va='center', fontsize=14, rotation=90)
+
+    plt.suptitle(f"{data.source_name} inter-station coherence contributions"
+                 f"\n{data.starttime.year}-{data.starttime.month}-{data.starttime.day} to {data.endtime.month}-{data.endtime.day}",
+                 fontsize=16)
+
+    if save:
+        plt.savefig(f"{save_dir}.jpg", dpi=300)
+
+    plt.show()
+
+    return fig, axs
+
+
+
+

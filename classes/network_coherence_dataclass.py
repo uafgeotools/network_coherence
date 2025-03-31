@@ -27,7 +27,8 @@ class DataBin:
 
         self.station_names = [tr.stats.station for tr in st]
 
-    def add_plotting_info(self, freq_min, freq_max, channel_str, starttime, endtime, nPairs, source_name):
+    def add_plotting_info(self, freq_min, freq_max, channel_str, starttime,
+                          endtime, nPairs, source_name, source_lat, source_lon):
         self.freq_min = freq_min
         self.freq_max = freq_max
 
@@ -44,5 +45,7 @@ class DataBin:
 
         self.nPairs = nPairs
         self.source_name = source_name
+        self.source_lat = source_lat
+        self.source_lon = source_lon
 
 

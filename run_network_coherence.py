@@ -8,20 +8,21 @@ from tools import toolbox, plotting
 FREQ_MIN = 0.1  # [Hz]
 FREQ_MAX = 10
 # Window length [sec]
-WINDOW_LENGTH = 6*60
+WINDOW_LENGTH = 4*60
 # Fraction of window overlap [0.0, 1.0)
 WINDOW_OVERLAP = 0.75  # 0.75
 
 # TIME, CHANNEL, AND SOURCE INFORMATION---------------------------------------------------------------------------------
-STARTTIME = UTCDateTime("2025-03-26T00:00:00")
-ANALYSIS_LEN = 3 * 24 * 60 * 60  # Length of analysis [sec]
+STARTTIME = UTCDateTime("2025-03-23T15:00:00")
+ANALYSIS_LEN = 1 * 24 * 60 * 60  # Length of analysis [sec]
 ENDTIME = STARTTIME + ANALYSIS_LEN
 
-CHANNEL = 'BHZ'  # channel for coherence computation
+CHANNEL = 'BHZ'  # select "BHZ" or "BHN, BHE" for vertical or horizontals, respectively
 
 SOURCE_NAME = "Spurr"
 SOURCE_LAT = 61.2989  # Source latitude (Spurr)
 SOURCE_LON = -152.2539  # Source longitude (Spurr)
+
 MAX_RADIUS = 25  # max radius to search for stations [km]
 STATIONS_TO_REMOVE = ["BRPK","BKG","N20K", "SPBL"]  # Remove these stations from the analysis
 
@@ -55,10 +56,16 @@ if st[0].stats.channel[1:] == 'HE' or st[0].stats.channel[1:] == 'HN':
 Cxy2_norm, data, nPairs = toolbox.get_network_coherence(st, WINDOW_LENGTH, WINDOW_OVERLAP, n_jobs=6)
 
 # Add plotting info to data class
-data.add_plotting_info(FREQ_MIN, FREQ_MAX, CHANNEL, STARTTIME, ENDTIME, nPairs, SOURCE_NAME)
+data.add_plotting_info(FREQ_MIN, FREQ_MAX, CHANNEL, STARTTIME, ENDTIME, nPairs, SOURCE_NAME, SOURCE_LAT, SOURCE_LON)
 
-#%% Plotting Coherogram
+#%% Plotting Median network coherogram
 fig, axs = plotting.plot_network_coherence(Cxy2_norm, data, save_dir=SAVE_DIR, save=False)
 
-#%% Plotting Station vs Station coherence contributions (TO-DO!)
+# ----------------------------------------------------------------------------------------------------------------------
+#%% Retrieve all station-pair coherograms in parallel
+# (separate from network coherence, requires a different parallelization)
+coherograms = toolbox.get_interstation_coherograms(st, data, n_jobs=6)
 
+#%% Plotting Station-pair coherence contributions (Meant for short periods of data, ~1 day to a few)
+SAVE_DIR = f"{os.getcwd()}/figures/interstation_coherence_{SOURCE_NAME}_{STARTTIME.year}_{STARTTIME.month}_{STARTTIME.day}"
+fig, axs = plotting.plot_interstation_coherence(coherograms, st, data, save_dir=SAVE_DIR, save=False)
