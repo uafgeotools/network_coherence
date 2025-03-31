@@ -62,7 +62,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
         f" {data.channel_str} channel\nStations: {data.station_names}", y=0.95)
 
     if save:
-        plt.savefig(f"{save_dir}.jpg", dpi=350)
+        plt.savefig(f"{save_dir}.jpg", dpi=300)
     plt.show()
 
     return fig, axs

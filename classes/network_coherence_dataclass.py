@@ -40,7 +40,7 @@ class DataBin:
         self.starttime = starttime
         self.endtime = endtime
         self.n_days = (endtime - starttime) / 86400
-        self.n_weeks = self.n_days // 7
+        self.n_weeks = self.n_days / 7
 
         self.nPairs = nPairs
         self.source_name = source_name
