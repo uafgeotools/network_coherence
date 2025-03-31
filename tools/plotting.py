@@ -11,7 +11,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
     c_lim = [0.4, 1.0]
 
     if data.n_weeks > 1: # A single plotting row should not contain more than 7 days of data
-        n_rows = np.ceil(data.n_weeks)
+        n_rows = int(np.ceil(data.n_weeks))
     else:
         n_rows = 1
 
