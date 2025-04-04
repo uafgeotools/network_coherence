@@ -66,8 +66,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
 
     if save:
         plt.savefig(f"{save_dir}.jpg", dpi=300)
-    end = time.time()
-    print(f"Plotting time: {end - start:.2f} seconds")
+        
     plt.show()
 
     return fig, axs
