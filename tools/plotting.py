@@ -89,16 +89,15 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     c_lim = [0.4, 1.0]
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
-    plt.subplots_adjust(hspace=0.05, wspace=0.05)
+    plt.subplots_adjust(left=0.07, bottom=0.05, hspace=0.05, top=0.95, wspace=0.04)
 
-    for i in range(1, N):  # loop over rows (remove top row)
-        for j in range(N - 1):  # loop over columns (remove rightmost column)
+    for i in range(0, N - 1):
+        for j in range(0, N - 1):
+            ax = axs[i, j]  # select correct axis
+            station_y = stations_sorted_asc[N - 2 - i][0]
+            station_x = stations_sorted_asc[j + 1][0]
 
-            ax = axs[i - 1, j]  # select correct axis
-            station_y = stations_sorted_asc[i][0]
-            station_x = stations_sorted_asc[j][0]
-
-            if i <= j:  # remove upper triangular panels
+            if not (N - 2 - i < j + 1):  # Turn off the panels in the upper left triangular
                 ax.set_frame_on(False)
                 ax.axis('off')
                 continue
@@ -117,28 +116,28 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
             ax.set_ylim(data.freq_min, data.freq_max)
             ax.set_xticks([])
 
-            if j == 0:  # set y-axis labels only on far left panels
+            if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
                 ax.set_ylabel(station_y, fontweight='bold')
             else:
                 ax.set_yticks([])
 
-            if i == N - 1:  # set x-axis labels for bottom row only
+            if i == N - 2:  # set x-axis labels for bottom row only
                 ax.set_xlabel(station_x, fontweight='bold')
 
     cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
     cbar = fig.colorbar(mesh, cax=cbar_ax)  # add colorbar
     cbar.set_label("Mag$^2$ Coherence")
 
-    # add overarching x axis label
-    fig.text(0.5, 0.05, f'Increasing distance from {data.source_name} --------------->',
-             ha='center', va='center', fontsize=14)
-    # add overarching y axis label
-    fig.text(0.05, 0.5, f'<--------------- Increasing distance from {data.source_name}',
-             ha='center', va='center', fontsize=14, rotation=90)
+    # add overarching x-axis label
+    fig.text(0.5, 0.02, f'Increasing distance from {data.source_name} --------------->',
+             ha='center', va='center', fontsize=16)
+    # add overarching y-axis label
+    fig.text(0.30, 0.55, f'Increasing distance from {data.source_name} --------------->',
+             ha='center', va='center', fontsize=16, rotation=45)
 
     plt.suptitle(f"{data.source_name} inter-station coherence contributions"
                  f"\n{data.starttime.year}-{data.starttime.month}-{data.starttime.day} to {data.endtime.month}-{data.endtime.day}",
-                 fontsize=16)
+                 fontsize=18)
 
     if save:
         plt.savefig(f"{save_dir}.jpg", dpi=300)
@@ -146,7 +145,6 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     plt.show()
 
     return fig, axs
-
 
 
 
