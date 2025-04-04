@@ -41,13 +41,15 @@ def remove_network_response(st, inv, type='full'):
     # Here we do secondary processing and interpolate stream if stations have differing sampling rates
     st.detrend('linear')
 
-    # find the trace with the lowest sampling rate
-    filt_tr = min(range(len(st)), key=lambda i: st[i].stats.sampling_rate)
-    # pre-filter before interpolation
-    st.filter('lowpass', freq=st[filt_tr].stats.sampling_rate / 2 - 2, corners=12, zerophase=True)
 
     sampling_rates = {tr.stats.sampling_rate for tr in st}  # get all sampling rates
     if len(sampling_rates) > 1:
+        # find the trace with the lowest sampling rate
+        filt_tr = min(range(len(st)), key=lambda i: st[i].stats.sampling_rate)
+        # pre-filter before interpolation
+        st.filter('lowpass', freq=st[filt_tr].stats.sampling_rate / 2 - 2,
+                  corners=12, zerophase=True)
+
         # interpolate to the lowest sampling rate if there are differences
         st.interpolate(sampling_rate=st[filt_tr].stats.sampling_rate, method='lanczos', a=15)
 
