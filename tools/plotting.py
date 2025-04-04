@@ -88,13 +88,16 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     c_lim = [0.4, 1.0]
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
-    plt.subplots_adjust(left=0.07, bottom=0.05, hspace=0.05, top=0.95, wspace=0.04)
+    plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.05, top=0.95, wspace=0.04)
 
     for i in range(0, N - 1):
         for j in range(0, N - 1):
             ax = axs[i, j]  # select correct axis
             station_y = stations_sorted_asc[N - 2 - i][0]
+            dist_y = stations_sorted_asc[N - 2 - i][1]
+
             station_x = stations_sorted_asc[j + 1][0]
+            dist_x = stations_sorted_asc[j + 1][1]
 
             if not (N - 2 - i < j + 1):  # Turn off the panels in the upper left triangular
                 ax.set_frame_on(False)
@@ -116,16 +119,16 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
             ax.set_xticks([])
 
             if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
-                ax.set_ylabel(station_y, fontweight='bold')
+                ax.set_ylabel(f"$\\bf{{{station_y}}}$\n {np.round(dist_y/1000,decimals=1)} km")
             else:
                 ax.set_yticks([])
 
             if i == N - 2:  # set x-axis labels for bottom row only
-                ax.set_xlabel(station_x, fontweight='bold')
+                ax.set_xlabel(f"$\\bf{{{station_x}}}$\n {np.round(dist_x/1000, decimals=1)} km")
 
     cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
     cbar = fig.colorbar(mesh, cax=cbar_ax)  # add colorbar
-    cbar.set_label("Mag$^2$ Coherence")
+    cbar.set_label("Mag$^2$ Coherence", fontsize=16)
 
     # add overarching x-axis label
     fig.text(0.5, 0.02, f'Increasing distance from {data.source_name} --------------->',
