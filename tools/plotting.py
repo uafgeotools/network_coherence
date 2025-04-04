@@ -39,7 +39,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
 
         # Plot the median network coherence for this row
         mesh = ax.imshow(row_Cxy2_norm, aspect='auto', cmap=colorm, origin='lower',
-                         extent=[row_t[0], row_t[-1], data.freq_vector[0],
+                         extent=[row_start, row_end, data.freq_vector[0],
                                  data.freq_vector[-1]], interpolation='none')
         mesh.set_clim(c_lim)
         ax.set_ylim(data.freq_min, data.freq_max)
@@ -51,10 +51,10 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
             ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H'))
         else:
             ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d'))
-        ax.tick_params(axis='x', labelsize=10)
+        ax.tick_params(axis='x')#, labelsize=10)
 
     # Label the x-axis on the bottom subplot only
-    axs[-1].set_xlabel('UTC Time',fontsize=14)
+    axs[-1].set_xlabel('UTC Time')#,fontsize=14)
 
     # add colorbar
     cbar = fig.colorbar(mesh, ax=axs, orientation='vertical', fraction=0.02, pad=0.04)
@@ -66,7 +66,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
 
     if save:
         plt.savefig(f"{save_dir}.jpg", dpi=300)
-        
+
     plt.show()
 
     return fig, axs
