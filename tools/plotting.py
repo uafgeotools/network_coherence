@@ -4,7 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.dates as dates
-mpl.use('Qt5Agg')
+#mpl.use('Qt5Agg')
 
 def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
     # set colormap and colorbar limits
@@ -38,7 +38,9 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
         row_Cxy2_norm = Cxy2_norm[:, mask]  # coherence matrix for this week
 
         # Plot the median network coherence for this row
-        mesh = ax.pcolormesh(row_t, data.freq_vector, row_Cxy2_norm, shading='auto', cmap=colorm)
+        mesh = ax.imshow(row_Cxy2_norm, aspect='auto', cmap=colorm, origin='lower',
+                         extent=[row_t[0], row_t[-1], data.freq_vector[0],
+                                 data.freq_vector[-1]], interpolation='none')
         mesh.set_clim(c_lim)
         ax.set_ylim(data.freq_min, data.freq_max)
         ax.set_xlim(row_start, row_end)
@@ -64,6 +66,8 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
 
     if save:
         plt.savefig(f"{save_dir}.jpg", dpi=300)
+    end = time.time()
+    print(f"Plotting time: {end - start:.2f} seconds")
     plt.show()
 
     return fig, axs
@@ -106,7 +110,9 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
                 coherogram = coherograms[(station_x, station_y)]
 
             # plot the coherogram
-            mesh = ax.pcolormesh(data.t, data.freq_vector, coherogram, shading='auto', cmap=colorm)
+            mesh = ax.imshow(coherogram, aspect='auto', cmap=colorm, origin='lower',
+                             extent=[data.t[0], data.t[-1], data.freq_vector[0],
+                                      data.freq_vector[-1]], interpolation='none')
             mesh.set_clim(c_lim)
             ax.set_ylim(data.freq_min, data.freq_max)
             ax.set_xticks([])
