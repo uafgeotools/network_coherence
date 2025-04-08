@@ -89,6 +89,7 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
     plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.1, top=0.95, wspace=0.1)
+    plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.1, top=0.95, wspace=0.1)
 
     for i in range(0, N - 1):
         for j in range(0, N - 1):
@@ -111,8 +112,10 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
                 coherogram = coherograms[(station_x, station_y)]
 
 
-            coherogram_with_strip, extended_t = add_median_strip(coherogram, data,
-                                                                 fbin=0.5)
+            coherogram_with_strip, extended_t = add_median_strip(coherogram, 
+                                                                 data,
+                                                                 fbin=0.5, 
+                                                                 thickness=15)
 
             # now plot
             mesh = ax.imshow(coherogram_with_strip, aspect='auto', cmap=colorm,
@@ -159,12 +162,13 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     return fig, axs
 
 
-def add_median_strip(coherogram, data, fbin=0.5):
+def add_median_strip(coherogram, data, fbin=0.5, thickness=15):
     """
     Add the median strip to the coherogram
     :param coherogram - 2D array of coherence values
     :param data: data object containing frequency vector and time vector
     :param fbin: frequency bin size, default is 0.5 Hz
+    :param thickness: thickness of the median strip, default is 15 pixels
     :return: coherogram with median strip, extended time vector
     """
 
@@ -195,7 +199,6 @@ def add_median_strip(coherogram, data, fbin=0.5):
 
     # Create thicker median strip (e.g., 10 pixels wide). Might need
     # to adjust this based on the size of the figure?
-    thickness = 20  # Number of pixels wide
     median_strip = np.full((len(data.freq_vector), thickness), np.nan)
 
     # Fill each 0.5 Hz bin row with its median value across the width
