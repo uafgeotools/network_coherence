@@ -37,10 +37,10 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
         row_t = data.t[mask]  # time vector for this week
         row_Cxy2_norm = Cxy2_norm[:, mask]  # coherence matrix for this week
 
-        # Plot the median network coherence for this row
+        #Plot the median network coherence for this row
         mesh = ax.imshow(row_Cxy2_norm, aspect='auto', cmap=colorm, origin='lower',
-                         extent=[row_start, row_end, data.freq_vector[0],
-                                 data.freq_vector[-1]], interpolation='none')
+                        extent=[row_start, row_end, data.freq_vector[0],
+                                data.freq_vector[-1]], interpolation='none')
         mesh.set_clim(c_lim)
         ax.set_ylim(data.freq_min, data.freq_max)
         ax.set_xlim(row_start, row_end)
@@ -89,8 +89,8 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
     plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.1, top=0.95, wspace=0.1)
-    plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.1, top=0.95, wspace=0.1)
 
+    ct = 0
     for i in range(0, N - 1):
         for j in range(0, N - 1):
             ax = axs[i, j]  # select correct axis
@@ -127,9 +127,17 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
 
             mesh.set_clim(c_lim)
             ax.set_ylim(data.freq_min, data.freq_max)
-            ax.set_xticks([])
 
+            # label the lowermost left panel only
+            if i == N - 2 and j == 0:
+                print("Adding median strip label")
+                ax.text(1, 1.03, 'Median', color='black', fontsize=10,
+                        ha='center', va='center', rotation=0,
+                        transform=ax.transAxes)
 
+            # add time ticks
+            ax.xaxis_date()
+            ax.set_xticklabels([])
 
             if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
                 ax.set_ylabel(f"$\\bf{{{station_y}}}$\n {np.round(dist_y/1000,decimals=1)} km")
