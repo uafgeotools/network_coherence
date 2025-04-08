@@ -88,7 +88,7 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     c_lim = [0.4, 1.0]
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
-    plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.05, top=0.95, wspace=0.04)
+    plt.subplots_adjust(left=0.07, bottom=0.07, hspace=0.1, top=0.95, wspace=0.1)
 
     for i in range(0, N - 1):
         for j in range(0, N - 1):
@@ -110,13 +110,23 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
             elif (station_x, station_y) in coherograms:
                 coherogram = coherograms[(station_x, station_y)]
 
-            # plot the coherogram
-            mesh = ax.imshow(coherogram, aspect='auto', cmap=colorm, origin='lower',
-                             extent=[data.t[0], data.t[-1], data.freq_vector[0],
-                                      data.freq_vector[-1]], interpolation='none')
+
+            coherogram_with_strip, extended_t = add_median_strip(coherogram, data,
+                                                                 fbin=0.5)
+
+            # now plot
+            mesh = ax.imshow(coherogram_with_strip, aspect='auto', cmap=colorm,
+                             origin='lower',
+                             extent=[extended_t[0], extended_t[-1],
+                                     data.freq_vector[0],
+                                     data.freq_vector[-1]],
+                             interpolation='none')
+
             mesh.set_clim(c_lim)
             ax.set_ylim(data.freq_min, data.freq_max)
             ax.set_xticks([])
+
+
 
             if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
                 ax.set_ylabel(f"$\\bf{{{station_y}}}$\n {np.round(dist_y/1000,decimals=1)} km")
@@ -148,5 +158,64 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
 
     return fig, axs
 
+
+def add_median_strip(coherogram, data, fbin=0.5):
+    """
+    Add the median strip to the coherogram
+    :param coherogram - 2D array of coherence values
+    :param data: data object containing frequency vector and time vector
+    :param fbin: frequency bin size, default is 0.5 Hz
+    :return: coherogram with median strip, extended time vector
+    """
+
+    # Create frequency z bins
+    bin_edges = np.arange(data.freq_vector[0],
+                          data.freq_vector[-1] + fbin, fbin)
+
+    # Compute median coherence per bin
+    bin_centers = []
+    bin_medians = []
+
+    for ii in range(len(bin_edges) - 1):
+        f_start = bin_edges[ii]
+        f_end = bin_edges[ii + 1]
+
+        # Find frequency indices in this bin
+        bin_indices = np.where((data.freq_vector >= f_start) & (
+                data.freq_vector < f_end))[0]
+
+        if len(bin_indices) > 0:
+            subset = coherogram[bin_indices, :]
+            median_val = np.median(subset)
+            bin_centers.append((f_start + f_end) / 2)
+            bin_medians.append(median_val)
+
+    bin_centers = np.array(bin_centers)
+    bin_medians = np.array(bin_medians)
+
+    # Create thicker median strip (e.g., 10 pixels wide). Might need
+    # to adjust this based on the size of the figure?
+    thickness = 20  # Number of pixels wide
+    median_strip = np.full((len(data.freq_vector), thickness), np.nan)
+
+    # Fill each 0.5 Hz bin row with its median value across the width
+    for ii in range(len(bin_edges) - 1):
+        f_start = bin_edges[ii]
+        f_end = bin_edges[ii + 1]
+
+        bin_indices = np.where((data.freq_vector >= f_start) & (
+                data.freq_vector < f_end))[0]
+
+        if len(bin_indices) > 0:
+            median_strip[bin_indices, :] = bin_medians[ii]
+
+    # Combine with original coherogram
+    coherogram_with_strip = np.hstack([coherogram, median_strip])
+
+    # Extend time axis to reflect new column
+    dt = data.t[1] - data.t[0]
+    extended_t = np.append(data.t, data.t[-1] + dt)
+
+    return coherogram_with_strip, extended_t
 
 
