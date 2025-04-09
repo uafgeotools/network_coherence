@@ -34,7 +34,6 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
 
         # Create a mask for indices corresponding to this week
         mask = (data.t >= row_start) & (data.t < row_end)
-        row_t = data.t[mask]  # time vector for this week
         row_Cxy2_norm = Cxy2_norm[:, mask]  # coherence matrix for this week
 
         #Plot the median network coherence for this row
@@ -47,17 +46,30 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
         ax.set_ylabel('Frequency [Hz]')
 
         ax.xaxis_date()
-        if n_rows == 1:
+        if n_rows == 1 and data.n_days <= 1:
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H:%M'))
+        elif n_rows == 1 and data.n_days > 1:
             ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H'))
         else:
             ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d'))
         ax.tick_params(axis='x')#, labelsize=10)
 
+        # Add median strip as separate axis so as not to perturb the time axes.
+        median_strip = get_median_strip(row_Cxy2_norm, data, fbin=0.2)
+        strip_ax = ax.inset_axes([1.0, 0, 0.03, 1], transform=ax.transAxes)
+
+        median_mesh = strip_ax.imshow(median_strip, aspect='auto', cmap=colorm,
+                                      origin='lower', interpolation='none')
+        median_mesh.set_clim(c_lim)
+        strip_ax.set_xticks([])
+        strip_ax.set_yticks([])
+        strip_ax.set_title("Median", fontsize=12)
+
     # Label the x-axis on the bottom subplot only
     axs[-1].set_xlabel('UTC Time')#,fontsize=14)
 
     # add colorbar
-    cbar = fig.colorbar(mesh, ax=axs, orientation='vertical', fraction=0.02, pad=0.04)
+    cbar = fig.colorbar(mesh, ax=axs, orientation='vertical', fraction=0.02, pad=0.05)
     cbar.set_label("Median Network\nMag$^2$ Coherence")
 
     fig.suptitle(
@@ -230,3 +242,23 @@ def add_median_strip(coherogram, data, fbin=0.5, thickness=15):
     return coherogram_with_strip, extended_t
 
 
+def get_median_strip(coherogram, data, fbin=0.5):
+    # Compute median along each row
+    medians = np.median(coherogram, axis=1)
+
+    # Determine the desired frequency bins based on the specified fbin size
+    min_freq = data.freq_min
+    max_freq = data.freq_max
+    desired_freqs = np.arange(min_freq, max_freq + fbin, fbin)
+
+    # Find indices for new frequency discretization
+    indices = []
+    for f in desired_freqs:
+        if f > max_freq:
+            break
+        idx = np.argmin(np.abs(data.freq_vector - f))
+        if idx not in indices:  # Avoid duplicates
+            indices.append(idx)
+
+    # Return the medians at the selected indices
+    return medians[indices].reshape(-1,1)
