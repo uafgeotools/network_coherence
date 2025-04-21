@@ -5,7 +5,7 @@ import threading
 from obspy.geodetics import gps2dist_azimuth
 import time
 import numpy as np
-from scipy.signal import coherence
+from scipy.signal import coherence, csd
 import multiprocess as mp
 from obspy.core import Stream
 
@@ -133,7 +133,7 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         monitor_thread.start()
         results = pool.map(compute_interval_median_Cxy2, range(data.nits))
         monitor_thread.join()
-        print("Coherence processing: 100% complete")
+        print("Processing: 100% complete")
 
     Cxy2_norm = np.array(results).T  # transpose to have time on the x-axis
 
@@ -151,7 +151,7 @@ def monitor_progress(total_tasks, progress_counter):
         percentage = progress_counter.value / total_tasks
         for m in milestones:
             if not printed[m] and percentage >= m:
-                print(f"Coherence processing: {m * 100:.0f}% complete")
+                print(f"Processing: {m * 100:.0f}% complete")
                 printed[m] = True
                 if m == milestones[-1]:  # Stop after 75%
                     return
@@ -199,7 +199,64 @@ def get_interstation_coherograms(st, data, n_jobs=1):
         monitor_thread.start()
         results = pool.map(compute_interstation_Cxy2, tasks)
         monitor_thread.join()
-        print("Coherence processing: 100% complete")
+        print("Processing: 100% complete")
     coherograms = {pair: Cxy2 for pair, Cxy2 in results}
 
     return coherograms
+
+
+def get_interstation_phase(st, window_length, window_overlap, n_jobs=1):
+    data = DataBin(window_length, window_overlap)
+    data.build_data(st)
+
+    # fill time vector t
+    for jj in range(data.nits):
+        t0_ind = data.intervals[jj]
+        try:
+            data.t[jj] = data.tvec[t0_ind + int(np.round(data.winlensamp / 2))]
+        except Exception:
+            data.t[jj] = np.nanmax(data.t)
+
+    progress_counter = mp.Value('i', 0)  # initialize counter for progress tracking
+
+    # function to compute inter-station coherence for a single station pair
+    def compute_interstation_phase(args):
+        i, j = args
+        phase_list = []
+
+        for jj in range(data.nits):
+            t0_ind = data.intervals[jj]
+            tf_ind = data.intervals[jj] + data.winlensamp
+            # get the cross-spectrum
+            _, Sxy = csd(st[i].data[t0_ind:tf_ind], st[j].data[t0_ind:tf_ind],
+                                fs=data.sampling_rate, window=data.window,
+                                nperseg=data.sub_window, noverlap=data.noverlap)
+
+            phase = np.angle(Sxy)  # get the phase from the cross-spectrum
+            phase_list.append(phase)
+
+        phase_array = np.array(phase_list).T
+        station_pair = (st[i].stats.station, st[j].stats.station)
+
+        global progress_counter
+        progress_counter.value += 1  # increment progress counter
+
+        return (station_pair, phase_array)
+
+    if n_jobs > os.cpu_count():  # ensure n_jobs is not greater than the number of available cores
+        n_jobs = os.cpu_count()
+
+    N = len(st)
+    tasks = [(i, j) for i in range(N) for j in range(i + 1, N)]  # all unique station pairs
+    nPairs = len(tasks)  # determine number of unique station pairs
+
+    # start parallel processing
+    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(progress_counter,)) as pool:
+        monitor_thread = threading.Thread(target=monitor_progress, args=(nPairs, progress_counter))
+        monitor_thread.start()
+        results = pool.map(compute_interstation_phase, tasks)
+        monitor_thread.join()
+        print("Processing: 100% complete")
+    phase_matrix = {pair: phase for pair, phase in results}
+
+    return phase_matrix, data, nPairs

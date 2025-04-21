@@ -1,10 +1,10 @@
 import numpy as np
 from obspy.geodetics import gps2dist_azimuth
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.dates as dates
-#mpl.use('Qt5Agg')
+from matplotlib import rcParams
+rcParams.update({'font.size': 14,'axes.labelsize': 16, 'axes.titlesize': 14,})
 
 def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
     # set colormap and colorbar limits
@@ -47,7 +47,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
 
         ax.xaxis_date()
         if n_rows == 1 and data.n_days <= 1:
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H:%M'))
+            ax.xaxis.set_major_formatter(dates.DateFormatter('%m-%d %H:%M'))
         elif n_rows == 1 and data.n_days > 1:
             ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H'))
         else:
@@ -63,14 +63,14 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
         median_mesh.set_clim(c_lim)
         strip_ax.set_xticks([])
         strip_ax.set_yticks([])
-        strip_ax.set_title("Median", fontsize=12)
+        strip_ax.set_title("Median")
 
     # Label the x-axis on the bottom subplot only
     axs[-1].set_xlabel('UTC Time')#,fontsize=14)
 
     # add colorbar
     cbar = fig.colorbar(mesh, ax=axs, orientation='vertical', fraction=0.02, pad=0.05)
-    cbar.set_label("Median Network\nMag$^2$ Coherence")
+    cbar.set_label("Median Network Mag$^2$ Coherence")
 
     fig.suptitle(
         f"{data.source_name} Median Network Coherence\n{data.nPairs} unique station pairs used,"
@@ -171,6 +171,103 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
              ha='center', va='center', fontsize=16, rotation=45)
 
     plt.suptitle(f"{data.source_name} inter-station coherence contributions"
+                 f"\n{data.starttime.year}-{data.starttime.month}-{data.starttime.day} to {data.endtime.month}-{data.endtime.day}",
+                 fontsize=18)
+
+    if save:
+        plt.savefig(f"{save_dir}.jpg", dpi=300)
+
+    plt.show()
+
+    return fig, axs
+
+
+def plot_interstation_phase(phase_matrix, coherograms, st, data, save_dir, coh_mask=True, save=False):
+
+    station_distances = []
+    for tr in st:
+        # find distance from source to each station
+        dist_m, _, _ = gps2dist_azimuth(data.source_lat, data.source_lon, tr.stats.latitude, tr.stats.longitude)
+        station_distances.append((tr.stats.station, dist_m))  # store station name and distance
+
+    stations_sorted_asc = sorted(station_distances, key=lambda x: x[1])  # sort stations by distance
+
+    N = len(stations_sorted_asc)
+
+    colorm = 'twilight_shifted'  # colormap for phase
+
+    fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
+    plt.subplots_adjust(left=0.09, bottom=0.09, hspace=0.1, top=0.95, wspace=0.1)
+
+    for i in range(0, N - 1):
+        for j in range(0, N - 1):
+            ax = axs[i, j]  # select correct axis
+            station_y = stations_sorted_asc[N - 2 - i][0]
+            dist_y = stations_sorted_asc[N - 2 - i][1]
+
+            station_x = stations_sorted_asc[j + 1][0]
+            dist_x = stations_sorted_asc[j + 1][1]
+
+            if not (N - 2 - i < j + 1):  # Turn off the panels in the upper left triangular
+                ax.set_frame_on(False)
+                ax.axis('off')
+                continue
+
+            # find the coherogram for this particular station pair
+            if (station_y, station_x) in coherograms:
+                coherogram = coherograms[(station_y, station_x)]
+                phase_mat = phase_matrix[(station_y, station_x)]
+
+            elif (station_x, station_y) in coherograms:
+                coherogram = coherograms[(station_x, station_y)]
+                phase_mat = phase_matrix[(station_x, station_y)]
+
+            # now plot
+            if coh_mask:
+                coherogram = coherogram = np.clip(coherogram, 0, 1)
+                mesh = ax.imshow(phase_mat, aspect='auto', cmap=colorm,
+                                 origin='lower',
+                                 extent=[data.t[0], data.t[-1],
+                                         data.freq_vector[0],
+                                         data.freq_vector[-1]],
+                                 interpolation='none', alpha=coherogram)
+            else:
+                mesh = ax.imshow(phase_mat, aspect='auto', cmap=colorm,
+                                 origin='lower',
+                                 extent=[data.t[0], data.t[-1],
+                                         data.freq_vector[0],
+                                         data.freq_vector[-1]],
+                                 interpolation='none')
+
+            ax.set_ylim(data.freq_min, data.freq_max)
+
+
+            # add time ticks
+            ax.xaxis_date()
+            ax.set_xticklabels([])
+
+            if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
+                ax.set_ylabel(f"$\\bf{{{station_y}}}$\n {np.round(dist_y/1000,decimals=1)} km")
+            else:
+                ax.set_yticks([])
+
+            if i == N - 2:  # set x-axis labels for bottom row only
+                ax.set_xlabel(f"$\\bf{{{station_x}}}$\n {np.round(dist_x/1000, decimals=1)} km")
+
+    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
+    cbar = fig.colorbar(mesh, cax=cbar_ax)  # add colorbar
+    cbar.set_label("Phase [radians]", fontsize=16)
+    cbar.set_ticks([-np.pi, -np.pi / 2, 0, np.pi / 2, np.pi])
+    cbar.set_ticklabels([r'$-\pi$', r'$-\frac{\pi}{2}$', '0', r'$\frac{\pi}{2}$', r'$\pi$'], fontsize=16)
+
+    # add overarching x-axis label
+    fig.text(0.5, 0.02, f'Increasing distance from {data.source_name} --------------->',
+             ha='center', va='center', fontsize=16)
+    # add overarching y-axis label
+    fig.text(0.30, 0.55, f'Increasing distance from {data.source_name} --------------->',
+             ha='center', va='center', fontsize=16, rotation=45)
+
+    plt.suptitle(f"{data.source_name} inter-station phase"
                  f"\n{data.starttime.year}-{data.starttime.month}-{data.starttime.day} to {data.endtime.month}-{data.endtime.day}",
                  fontsize=18)
 
