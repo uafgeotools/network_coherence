@@ -8,22 +8,22 @@ from tools import toolbox, plotting
 FREQ_MIN = 0.1  # [Hz]
 FREQ_MAX = 10
 # Window length [sec]
-WINDOW_LENGTH = 6*60
+WINDOW_LENGTH = 2*60
 # Fraction of window overlap [0.0, 1.0)
 WINDOW_OVERLAP = 0.75  # 0.75
 
 # TIME, CHANNEL, AND SOURCE INFORMATION---------------------------------------------------------------------------------
-STARTTIME = UTCDateTime("2025-04-10T23:30:00")
-ANALYSIS_LEN = 2 * 24 * 60 * 60  # Length of analysis [sec]
+STARTTIME = UTCDateTime("2025-04-27T13:30:00")
+ANALYSIS_LEN = 30 * 60  # Length of analysis [sec]
 ENDTIME = STARTTIME + ANALYSIS_LEN
 
 CHANNEL = "*HZ"  # select "*HZ" or "*HN, *HE" for vertical or horizontals, respectively
 
-SOURCE_NAME = "Spurr"
-SOURCE_LAT = 61.2989  # Source latitude (Spurr)
-SOURCE_LON = -152.2539  # Source longitude (Spurr)
+SOURCE_NAME = "Akutan_Tectonic"
+SOURCE_LAT = 54.134
+SOURCE_LON = -165.986
 
-MAX_RADIUS = 25  # max radius to search for stations [km]
+MAX_RADIUS = 15  # max radius to search for stations [km]
 STATIONS_TO_REMOVE = ["BRPK", "BKG", "N20K","SPCN", "RDE", "RED"]  # Remove these stations from the analysis
 
 FILENAME = f"interstation_phase_{SOURCE_NAME}_{STARTTIME.year}_{STARTTIME.month}_{STARTTIME.day}"
@@ -47,7 +47,7 @@ for remove in STATIONS_TO_REMOVE:
         network.stations = [station for station in network.stations if station.code != remove]
 
 #%% Remove response, interpolate (if needed), and rotate if horizontals
-st = toolbox.remove_network_response(st, inv, type='sensitivity')  # other option 'full'
+st = toolbox.remove_network_response(st, inv, type='full')  # other option 'full'
 
 if st[0].stats.channel[1:] == 'HE' or st[0].stats.channel[1:] == 'HN':
     st = toolbox.rotate_stations(st, inv, SOURCE_LAT, SOURCE_LON, output='radial')  # rotate to radial or transverse

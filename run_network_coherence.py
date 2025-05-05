@@ -13,22 +13,22 @@ WINDOW_LENGTH = 4*60
 WINDOW_OVERLAP = 0.75  # 0.75
 
 # TIME, CHANNEL, AND SOURCE INFORMATION---------------------------------------------------------------------------------
-STARTTIME = UTCDateTime("2025-03-28T19:00:00")
-ANALYSIS_LEN = 5 * 24 * 60 * 60  # Length of analysis [sec]
+STARTTIME = UTCDateTime("2025-05-02T17:00:00")
+ANALYSIS_LEN = 10 * 60 * 60  # Length of analysis [sec]
 ENDTIME = STARTTIME + ANALYSIS_LEN
 
-CHANNEL = 'BHZ'  # select "BHZ" or "BHN, BHE" for vertical or horizontals, respectively
+CHANNEL = "BHZ"  # select "*HZ" or "*HN, *HE" for vertical or horizontals, respectively
 
-#SOURCE_NAME = "Spurr"
-#SOURCE_LAT = 61.2989  # Source latitude (Spurr)
-#SOURCE_LON = -152.2539  # Source longitude (Spurr)
+SOURCE_NAME = "Spurr"
+SOURCE_LAT = 61.2989  # Source latitude (Spurr)
+SOURCE_LON = -152.2539  # Source longitude (Spurr)
+#SOURCE_LAT = 61.264770025202544  # Source latitude (Crater Peak)
+#SOURCE_LON = -152.239314483138  # Source longitude (Crater Peak)
 
-SOURCE_NAME = "Korovin"
-SOURCE_LAT = 52.37934 # Source latitude (Korovin)
-SOURCE_LON = -174.1548  # Source longitude (Korovin)
+
 
 MAX_RADIUS = 25  # max radius to search for stations [km]
-STATIONS_TO_REMOVE = ["BRPK", "BKG", "SPBL", "N20K"]  # Remove these stations from the analysis
+STATIONS_TO_REMOVE = ["BRPK", "BKG", "SPCN", "N20K", "RD03", "DFR", "RED","RDE"]  # Remove these stations from the analysis
 
 FILENAME = f"network_coherence_{SOURCE_NAME}_{STARTTIME.year}_{STARTTIME.month}_{STARTTIME.day}"
 SAVE_DIR = f"{os.getcwd()}/figures/{FILENAME}"
@@ -42,7 +42,7 @@ inv = client.get_stations(latitude=SOURCE_LAT, longitude=SOURCE_LON,
                           endtime=ENDTIME, level="response")
 
 st = gather_waveforms_bulk(lon_0=SOURCE_LON, lat_0=SOURCE_LAT, max_radius=MAX_RADIUS, network='*',
-                           station='*', location='*', channel=CHANNEL, starttime=STARTTIME, endtime=ENDTIME, n_jobs=4)
+                           station='*', location='*', channel=CHANNEL, starttime=STARTTIME, endtime=ENDTIME, n_jobs=6)
 
 # Filter out bad stations from st and inv
 for remove in STATIONS_TO_REMOVE:
@@ -57,11 +57,10 @@ if st[0].stats.channel[1:] == 'HE' or st[0].stats.channel[1:] == 'HN':
     st = toolbox.rotate_stations(st, inv, SOURCE_LAT, SOURCE_LON, output='radial')  # rotate to radial or transverse
 
 #%% Get median network coherence in parallel
-Cxy2_norm, data, nPairs = toolbox.get_network_coherence(st, WINDOW_LENGTH, WINDOW_OVERLAP, n_jobs=6)
+Cxy2_norm, data = toolbox.get_network_coherence(st, WINDOW_LENGTH, WINDOW_OVERLAP, n_jobs=6)
 
 # Add plotting info to data class
-data.add_plotting_info(FREQ_MIN, FREQ_MAX, CHANNEL, STARTTIME, ENDTIME, nPairs, SOURCE_NAME, SOURCE_LAT, SOURCE_LON)
-
+data.add_plotting_info(FREQ_MIN, FREQ_MAX, CHANNEL, STARTTIME, ENDTIME, SOURCE_NAME, SOURCE_LAT, SOURCE_LON)
 #%% PLOTTING Median network coherogram
 fig, axs = plotting.plot_network_coherence(Cxy2_norm, data, save_dir=SAVE_DIR, save=False)
 
@@ -72,4 +71,4 @@ coherograms = toolbox.get_interstation_coherograms(st, data, n_jobs=6)
 
 #%% PLOTTING Station-pair coherence contributions (Meant for short periods of data, ~1 day to a few)
 SAVE_DIR = f"{os.getcwd()}/figures/interstation_coherence_{SOURCE_NAME}_{STARTTIME.year}_{STARTTIME.month}_{STARTTIME.day}"
-fig, axs = plotting.plot_interstation_coherence(coherograms, st, data, save_dir=SAVE_DIR, save=True)
+fig, axs = plotting.plot_interstation_coherence(coherograms, st, data, save_dir=SAVE_DIR, save=False)

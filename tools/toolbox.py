@@ -38,10 +38,6 @@ def remove_network_response(st, inv, type='full'):
 
     print("Response/sensitivity removal complete.")
 
-    # Here we do secondary processing and interpolate stream if stations have differing sampling rates
-    st.detrend('linear')
-
-
     sampling_rates = {tr.stats.sampling_rate for tr in st}  # get all sampling rates
     if len(sampling_rates) > 1:
         # find the trace with the lowest sampling rate
@@ -110,9 +106,17 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         t0_ind = data.intervals[jj]
         tf_ind = data.intervals[jj] + data.winlensamp
 
+        contributing_stations = []
         Cxy2_list = []
         for i in range(len(st)):
+            data_i = st[i].data[t0_ind:tf_ind]
+            if np.unique(data_i).size == 1:  # check if data is a constant "dead" trace
+                continue
+            contributing_stations.append(st[i].stats.station)  # add station as contributor if it has data
             for j in range(i + 1, len(st)):
+                data_j = st[j].data[t0_ind:tf_ind]
+                if np.unique(data_j).size == 1:  # check here too
+                    continue
                 _, Cxy2 = coherence(st[i].data[t0_ind:tf_ind], st[j].data[t0_ind:tf_ind],
                                    fs=data.sampling_rate, window=data.window,
                                    nperseg=data.sub_window, noverlap=data.noverlap)
@@ -121,8 +125,15 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         global progress_counter
         progress_counter.value += 1  # increment progress counter
 
+        n_contributing_stations = len(contributing_stations)
+
+        if len(Cxy2_list) > 0:
+            median_Cxy2 = np.median(Cxy2_list, axis=0)
+        else:
+            median_Cxy2 = np.full_like(data.freq_vector, np.nan)  # fill with NaN if no valid pairs
+
         # This returns the median coherence for a single time window for all unique station pairs.
-        return np.median(Cxy2_list, axis=0)
+        return median_Cxy2, n_contributing_stations
 
     if n_jobs > os.cpu_count():  # ensure n_jobs is not greater than the number of available cores
         n_jobs = os.cpu_count()
@@ -135,9 +146,12 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         monitor_thread.join()
         print("Processing: 100% complete")
 
-    Cxy2_norm = np.array(results).T  # transpose to have time on the x-axis
+    Cxy2_norm = np.array([res[0] for res in results]).T  # transpose to have time on the x-axis
+    n_contributing_stations = np.array([res[1] for res in results])  # get number of pairs per window
+    data.n_station_contributions = n_contributing_stations
+    data.nPairs = nPairs
 
-    return Cxy2_norm, data, nPairs
+    return Cxy2_norm, data
 
 def init_worker(counter):
     global progress_counter
@@ -159,9 +173,6 @@ def monitor_progress(total_tasks, progress_counter):
         time.sleep(1)
 
 def get_interstation_coherograms(st, data, n_jobs=1):
-
-    if data.n_weeks > 1:  # not sure whether to implement yet, need to test
-        warnings.warn("Runtime may be slow for long datasets. Consider reducing time period to 1 week or less.")
 
     progress_counter = mp.Value('i', 0)  # initialize counter for progress tracking
 

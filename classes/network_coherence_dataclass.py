@@ -6,6 +6,8 @@ class DataBin:
     def __init__(self, window_length, window_overlap):
         self.window_length = window_length
         self.window_overlap = window_overlap
+        self.nPairs = None
+        self.n_station_contributions = None
 
     def build_data(self, st):
         # Assumes all traces have the same sample rate and length
@@ -25,10 +27,11 @@ class DataBin:
         self.freq_vector = rfftfreq(self.sub_window, 1 / self.sampling_rate)
         self.t = np.full(self.nits, np.nan)
 
+        self.nStations = len(st)
         self.station_names = [tr.stats.station for tr in st]
 
     def add_plotting_info(self, freq_min, freq_max, channel_str, starttime,
-                          endtime, nPairs, source_name, source_lat, source_lon):
+                          endtime, source_name, source_lat, source_lon):
         self.freq_min = freq_min
         self.freq_max = freq_max
 
@@ -43,7 +46,6 @@ class DataBin:
         self.n_days = (endtime - starttime) / 86400
         self.n_weeks = self.n_days / 7
 
-        self.nPairs = nPairs
         self.source_name = source_name
         self.source_lat = source_lat
         self.source_lon = source_lon
