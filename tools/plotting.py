@@ -74,8 +74,9 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
         pair_ax = ax.inset_axes([0, 1, 1, 0.02], transform=ax.transAxes)
         n_stations = data.n_station_contributions[mask]
         levels = np.arange(2, data.nStations + 1, 1)  # Discrete levels from 0 to total stations
+        half_edges = np.concatenate(([levels[0] - 0.5], levels + 0.5))
         cmap = plt.get_cmap('Greys_r', len(levels))
-        norm = BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+        norm = BoundaryNorm(half_edges, ncolors=cmap.N, clip=True)
 
         pair_ax.imshow(n_stations[np.newaxis, :], aspect='auto', cmap=cmap, norm=norm,
                        extent=[row_start, row_end, 0, 1])
@@ -93,7 +94,6 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
     sm = ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=2, vmax=data.nStations))
     sm.set_array([])  # Required for colorbar
     cbar_ax = fig.add_axes([0.04, 0.94, 0.2, 0.015])  # Position: left, top, width, height
-    half_edges = np.concatenate(([levels[0] - 0.5], levels + 0.5))
     cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal',
                 boundaries=half_edges, ticks=levels, spacing='uniform')
     cbar.set_label('# of Contributing Stations')

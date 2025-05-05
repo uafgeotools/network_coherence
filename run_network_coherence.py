@@ -62,7 +62,7 @@ Cxy2_norm, data = toolbox.get_network_coherence(st, WINDOW_LENGTH, WINDOW_OVERLA
 # Add plotting info to data class
 data.add_plotting_info(FREQ_MIN, FREQ_MAX, CHANNEL, STARTTIME, ENDTIME, SOURCE_NAME, SOURCE_LAT, SOURCE_LON)
 #%% PLOTTING Median network coherogram
-fig, axs = plotting.plot_network_coherence(Cxy2_norm, data, save_dir=SAVE_DIR, save=False)
+fig, axs = plotting.plot_network_coherence(Cxy2_norm, data, save_dir=SAVE_DIR, save=True)
 
 # ----------------------------------------------------------------------------------------------------------------------
 #%% Retrieve all station-pair coherograms in parallel
