@@ -5,7 +5,7 @@ import threading
 from obspy.geodetics import gps2dist_azimuth
 import time
 import numpy as np
-from scipy.signal import coherence, csd
+from scipy.signal import coherence, csd, welch
 import multiprocess as mp
 from obspy.core import Stream
 
@@ -87,6 +87,7 @@ def rotate_stations(st, inv, source_lat, source_lon, output='radial'):
 # --------------COHERENCE CALCULATION-----------------------------------------
 
 def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
+
     data = DataBin(window_length, window_overlap)
     data.build_data(st)
 
@@ -106,33 +107,58 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         t0_ind = data.intervals[jj]
         tf_ind = data.intervals[jj] + data.winlensamp
 
-        contributing_stations = []
-        Cxy2_list = []
+        participating = set()            # stations that actually contributed to computed pairs
+        Cxy2_list = []                   # list of pairwise coherence arrays
+
         for i in range(len(st)):
             data_i = st[i].data[t0_ind:tf_ind]
-            if np.unique(data_i).size == 1:  # check if data is a constant "dead" trace
+            # skip completely dead / constant traces
+            if np.unique(data_i).size == 1:
                 continue
-            contributing_stations.append(st[i].stats.station)  # add station as contributor if it has data
             for j in range(i + 1, len(st)):
                 data_j = st[j].data[t0_ind:tf_ind]
-                if np.unique(data_j).size == 1:  # check here too
+                if np.unique(data_j).size == 1:
                     continue
-                _, Cxy2 = coherence(st[i].data[t0_ind:tf_ind], st[j].data[t0_ind:tf_ind],
-                                   fs=data.sampling_rate, window=data.window,
-                                   nperseg=data.sub_window, noverlap=data.noverlap)
-                Cxy2_list.append(Cxy2)
 
+                # compute pair coherence
+                try:
+                    _, Cxy2 = coherence(data_i, data_j,
+                                        fs=data.sampling_rate, window=data.window,
+                                        nperseg=data.sub_window, noverlap=data.noverlap)
+                except Exception:
+                    # if coherence failed for this pair, skip it
+                    continue
+
+                # consider a pair "valid" only if it produced any finite values
+                if np.any(np.isfinite(Cxy2)):
+                    Cxy2_list.append(Cxy2)
+                    participating.add(st[i].stats.station)
+                    participating.add(st[j].stats.station)
+                else:
+                    # pair produced only NaNs (or non-finite) -> treat as non-contributing
+                    continue
+
+        # increment shared progress counter for the pool/monitor
         global progress_counter
-        progress_counter.value += 1  # increment progress counter
+        progress_counter.value += 1
 
-        n_contributing_stations = len(contributing_stations)
-
+        # compute median across pairs if any valid pairs exist
         if len(Cxy2_list) > 0:
-            median_Cxy2 = np.median(Cxy2_list, axis=0)
-        else:
-            median_Cxy2 = np.full_like(data.freq_vector, np.nan)  # fill with NaN if no valid pairs
+            median_Cxy2 = np.median(np.array(Cxy2_list), axis=0)
+            n_contributing_stations = len(participating)
+            # If you want to treat median that is all-NaN OR all-zero as "no contributors",
+            # apply that rule here (you asked for 0 when column value is 0 or nan).
 
-        # This returns the median coherence for a single time window for all unique station pairs.
+            all_nan = np.all(np.isnan(median_Cxy2))  # if all values are NaN, treat as < 2 stations
+            all_zero = np.all(np.isfinite(median_Cxy2) & (np.abs(median_Cxy2) <= 1e-12))  # if all values are zero (or very close), treat as < 2 stations
+            if all_nan or all_zero:
+                n_contributing_stations = 0
+                median_Cxy2 = np.full_like(median_Cxy2, np.nan)  # represent as no data
+        else:
+            # no valid pairs -> no contributors; return NaN column
+            median_Cxy2 = np.full_like(data.freq_vector, np.nan)
+            n_contributing_stations = 0
+
         return median_Cxy2, n_contributing_stations
 
     if n_jobs > os.cpu_count():  # ensure n_jobs is not greater than the number of available cores
@@ -146,12 +172,13 @@ def get_network_coherence(st, window_length, window_overlap, n_jobs=1):
         monitor_thread.join()
         print("Processing: 100% complete")
 
-    Cxy2_norm = np.array([res[0] for res in results]).T  # transpose to have time on the x-axis
-    n_contributing_stations = np.array([res[1] for res in results])  # get number of pairs per window
+    Cxy2_norm = np.array([res[0] for res in results]).T  # transpose to have freq x time
+    n_contributing_stations = np.array([res[1] for res in results])  # get number of stations per window
     data.n_station_contributions = n_contributing_stations
     data.nPairs = nPairs
 
     return Cxy2_norm, data
+
 
 def init_worker(counter):
     global progress_counter
@@ -159,7 +186,7 @@ def init_worker(counter):
 
 # function to keep track of multiprocessing progress
 def monitor_progress(total_tasks, progress_counter):
-    milestones = [0.25, 0.50, 0.75]
+    milestones = [0.20, 0.40, 0.60, 0.8]
     printed = {m: False for m in milestones}
     while progress_counter.value < total_tasks:
         percentage = progress_counter.value / total_tasks
@@ -167,7 +194,7 @@ def monitor_progress(total_tasks, progress_counter):
             if not printed[m] and percentage >= m:
                 print(f"Processing: {m * 100:.0f}% complete")
                 printed[m] = True
-                if m == milestones[-1]:  # Stop after 75%
+                if m == milestones[-1]:  # Stop after 80%
                     return
                 break
         time.sleep(1)
@@ -271,3 +298,55 @@ def get_interstation_phase(st, window_length, window_overlap, n_jobs=1):
     phase_matrix = {pair: phase for pair, phase in results}
 
     return phase_matrix, data, nPairs
+
+def get_all_spectrograms(st, window_length, window_overlap, n_jobs=1):
+    data = DataBin(window_length, window_overlap)
+    data.build_data(st)
+
+    # fill time vector t
+    for jj in range(data.nits):
+        t0_ind = data.intervals[jj]
+        try:
+            data.t[jj] = data.tvec[t0_ind + int(np.round(data.winlensamp / 2))]
+        except Exception:
+            data.t[jj] = np.nanmax(data.t)
+
+    progress_counter = mp.Value('i', 0)  # initialize counter for progress tracking
+
+    # function to compute spectrogram for a single trace
+    def compute_spectrogram(i):
+
+        Sxx_list = []
+        for jj in range(data.nits):
+            t0_ind = data.intervals[jj]
+            tf_ind = data.intervals[jj] + data.winlensamp
+
+            _, Sxx = welch(st[i].data[t0_ind:tf_ind],
+                           fs=data.sampling_rate, window=data.window,
+                           nperseg=data.sub_window, noverlap=data.noverlap)
+            Sxx_list.append(Sxx)
+
+        Sxx_array = np.array(Sxx_list).T
+        station_code = st[i].stats.station
+
+        global progress_counter
+        progress_counter.value += 1  # increment progress counter
+
+        return (station_code, Sxx_array)
+
+    if n_jobs > os.cpu_count():  # ensure n_jobs is not greater than the number of available cores
+        n_jobs = os.cpu_count()
+
+    N = len(st)
+
+    # start parallel processing
+    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(progress_counter,)) as pool:
+        monitor_thread = threading.Thread(target=monitor_progress, args=(N, progress_counter))
+        monitor_thread.start()
+        results = pool.map(compute_spectrogram, range(N))
+        monitor_thread.join()
+        print("Processing: 100% complete")
+
+    spectrograms = {station: spec for station, spec in results}
+
+    return spectrograms

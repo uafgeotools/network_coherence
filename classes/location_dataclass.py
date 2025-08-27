@@ -1,13 +1,10 @@
 import numpy as np
-from scipy.fft import rfftfreq
 
 class DataBin:
     """DataBin class for windowing information for time-frequency analysis and plotting"""
     def __init__(self, window_length, window_overlap):
         self.window_length = window_length
         self.window_overlap = window_overlap
-        self.nPairs = None
-        self.n_station_contributions = None
 
     def build_data(self, st):
         # Assumes all traces have the same sample rate and length
@@ -27,33 +24,6 @@ class DataBin:
         self.freq_vector = rfftfreq(self.sub_window, 1 / self.sampling_rate)
         self.t = np.full(self.nits, np.nan)
 
-        self.nStations = len(st)
         self.station_names = [tr.stats.station for tr in st]
 
-    def add_plotting_info(self, freq_min, freq_max, channel_str, starttime,
-                          endtime, source_name, source_lat, source_lon):
-        self.freq_min = freq_min
-        self.freq_max = freq_max
-
-        self.channel_str = channel_str
-        if self.channel_str == 'BHZ':
-            self.channel_str = 'Vertical'
-        elif self.channel_str == "BHN, BHE" or self.channel_str == "BHE, BHN":
-            self.channel_str = 'Horizontal'
-
-        self.starttime = starttime
-        self.endtime = endtime
-        self.n_days = (endtime - starttime) / 86400
-        self.n_weeks = self.n_days / 7
-
-        self.source_name = source_name
-        self.source_lat = source_lat
-        self.source_lon = source_lon
-
-        if self.source_lon == None and self.source_lat == None:  # Assign array or network label
-            self.label = "Array"
-            self.sub_label = "Elements"
-        else:
-            self.label = "Network"
-            self.sub_label = "Stations"
 

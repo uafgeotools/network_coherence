@@ -1,119 +1,137 @@
 import numpy as np
 from obspy.geodetics import gps2dist_azimuth
 import matplotlib.pyplot as plt
-from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
+from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm, ListedColormap
 from matplotlib.cm import ScalarMappable
 import matplotlib.dates as dates
 from matplotlib import rcParams
+import matplotlib as mpl
+mpl.use('Qt5Agg')
 rcParams.update({'font.size': 14,'axes.labelsize': 16, 'axes.titlesize': 14,})
 
-def plot_network_coherence(Cxy2_norm, data, save_dir, save=False):
-    # set colormap and colorbar limits
-    colorm = LinearSegmentedColormap.from_list('', ['white', *plt.get_cmap('magma_r').colors])
-    c_lim = [0.4, 1.0]
+import matplotlib.pyplot as plt
+import matplotlib.dates as dates
+import numpy as np
+from matplotlib.colors import ListedColormap, BoundaryNorm
+from matplotlib.cm import ScalarMappable
+from matplotlib.colors import LinearSegmentedColormap
 
-    if data.n_weeks > 1: # A single plotting row should not contain more than 7 days of data
-        n_rows = int(np.ceil(data.n_weeks))
+def plot_network_coherence(Cxy2_norm, data, save_dir, save=False, cmin=0.4, cmax=1):
+    # --- colormap for coherence ---
+    colorm = LinearSegmentedColormap.from_list(
+        '', ['white', *plt.get_cmap('magma_r').colors]
+    )
+    c_lim = [cmin, cmax]
+
+    # --- figure and axis ---
+    fig, ax = plt.subplots(figsize=(16, 10))
+    plt.subplots_adjust(left=0.06, right=0.94, bottom=0.1, top=0.86)
+
+    # --- main coherence image ---
+    mesh = ax.imshow(
+        Cxy2_norm,
+        aspect='auto',
+        cmap=colorm,
+        origin='lower',
+        extent=[data.starttime.matplotlib_date,
+                data.endtime.matplotlib_date,
+                data.freq_vector[0],
+                data.freq_vector[-1]],
+        interpolation='none'
+    )
+    mesh.set_clim(c_lim)
+    ax.set_ylim(data.freq_min, data.freq_max)
+    ax.set_xlim(data.starttime.matplotlib_date, data.endtime.matplotlib_date)
+    ax.set_ylabel('Frequency [Hz]')
+
+    # x-axis formatting
+    x_ticks = np.linspace(data.starttime.matplotlib_date, data.endtime.matplotlib_date, 6)
+    ax.set_xticks(x_ticks)
+    ax.xaxis_date()
+    if data.n_days <= 1:
+        ax.xaxis.set_major_formatter(dates.DateFormatter('%m-%d %H:%M'))
     else:
-        n_rows = 1
+        ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H'))
+    ax.tick_params(axis='x')
+    ax.grid(alpha=0.8)
 
-    # Set up time bounds for the rows if > 1 row
-    start_time = data.starttime.matplotlib_date
-    end_time = data.endtime.matplotlib_date
-    duration = end_time - start_time
-    row_bounds = [(start_time + i * duration / n_rows, start_time + (i + 1) * duration / n_rows) for i in range(n_rows)]
+    # --- median strip (right side) ---
+    median_strip = get_median_strip(Cxy2_norm, data, fbin=0.1)
+    strip_ax = ax.inset_axes([1.0, 0, 0.03, 1], transform=ax.transAxes)
+    median_mesh = strip_ax.imshow(
+        median_strip,
+        aspect='auto',
+        cmap=colorm,
+        origin='lower',
+        interpolation='none'
+    )
+    median_mesh.set_clim(c_lim)
+    strip_ax.set_xticks([])
+    strip_ax.set_yticks([])
+    strip_ax.text(1, 1, 'Median', rotation=45, ha='center', va='bottom',
+                  transform=strip_ax.transAxes)
 
-    fig, axs = plt.subplots(n_rows, 1, figsize=(16, 10), sharex=False, sharey=True)
-    plt.subplots_adjust(left=0.06, right=0.94, bottom=0.06, top=0.86, hspace=0.15)  # adjust spacing as needed
+    # --- greyscale station counts strip (on top) ---
+    n_stations_total = int(getattr(data, 'nStations', 0) or 0)
+    values = [0] + list(range(2, n_stations_total + 1))  # skip 1
+    base_cmap = plt.get_cmap('Greys_r')
+    colors = base_cmap(np.linspace(0.0, 1.0, len(values)))
+    greys_cmap = ListedColormap(colors)
+    grey_norm = BoundaryNorm(np.arange(len(values) + 1) - 0.5,
+                             ncolors=len(values), clip=True)
 
-    if n_rows == 1:  # Ensure axs is a list for looping
-        axs = [axs]
+    n_stations = np.asarray(data.n_station_contributions, dtype=int)
+    mapped = np.full_like(n_stations, fill_value=-1, dtype=int)
+    for i, v in enumerate(values):
+        mapped[n_stations == v] = i
 
-    for idx, ax in enumerate(axs):
+    pair_ax = ax.inset_axes([0, 1, 1, 0.02], transform=ax.transAxes)
+    pair_ax.imshow(mapped[np.newaxis, :],
+                   aspect='auto',
+                   cmap=greys_cmap, norm=grey_norm,
+                   extent=[data.starttime.matplotlib_date,
+                           data.endtime.matplotlib_date, 0, 1],
+                   origin='lower', interpolation='nearest')
+    pair_ax.set_yticks([])
+    pair_ax.set_xticks([])
 
-        row_start, row_end = row_bounds[idx]  # start and end times for this row
+    # --- labels ---
+    ax.set_xlabel('UTC Time')
 
-        # Create a mask for indices corresponding to this week
-        mask = (data.t >= row_start) & (data.t < row_end)
-        row_Cxy2_norm = Cxy2_norm[:, mask]  # coherence matrix for this week
+    # --- coherence colorbar ---
+    cbar = fig.colorbar(mesh, ax=ax, orientation='vertical', fraction=0.05, pad=0.05)
+    cbar.set_label(f"Median {data.label} Mag$^2$ Coherence")
 
-        #Plot the median network coherence for this row
-        mesh = ax.imshow(row_Cxy2_norm, aspect='auto', cmap=colorm, origin='lower',
-                        extent=[row_start, row_end, data.freq_vector[0],
-                                data.freq_vector[-1]], interpolation='none')
-        mesh.set_clim(c_lim)
-        ax.set_ylim(data.freq_min, data.freq_max)
-        ax.set_xlim(row_start, row_end)
-        ax.set_ylabel('Frequency [Hz]')
+    # --- station counts colorbar ---
+    sm = ScalarMappable(cmap=greys_cmap, norm=grey_norm)
+    sm.set_array([])
+    cbar_ax = fig.add_axes([0.03, 0.94, 0.2, 0.015])  # left, top, width, height
+    cbar2 = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
+    cbar2.set_ticks(np.arange(len(values)))
+    cbar2.set_ticklabels([str(v) for v in values])
+    cbar2.set_label(f'# of Contributing {data.sub_label}')
 
-        x_ticks = np.linspace(row_start, row_end, 6)
-        ax.set_xticks(x_ticks)
-
-        ax.xaxis_date()
-        if n_rows == 1 and data.n_days <= 1:
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%m-%d %H:%M'))
-        elif n_rows == 1 and data.n_days > 1:
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H'))
-        else:
-            ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d'))
-        ax.tick_params(axis='x') #, labelsize=10)
-
-        # Add median strip as separate axis so as not to perturb the time axes.
-        median_strip = get_median_strip(row_Cxy2_norm, data, fbin=0.2)
-        strip_ax = ax.inset_axes([1.0, 0, 0.03, 1], transform=ax.transAxes)
-
-        median_mesh = strip_ax.imshow(median_strip, aspect='auto', cmap=colorm,
-                                      origin='lower', interpolation='none')
-        median_mesh.set_clim(c_lim)
-        strip_ax.set_xticks([])
-        strip_ax.set_yticks([])
-        strip_ax.text(1, 1, 'Median', rotation=45, ha='center', va='bottom',
-                      transform=strip_ax.transAxes)
-
-        # Add greyscale bar for number of contributing pairs
-        pair_ax = ax.inset_axes([0, 1, 1, 0.02], transform=ax.transAxes)
-        n_stations = data.n_station_contributions[mask]
-        levels = np.arange(2, data.nStations + 1, 1)  # Discrete levels from 0 to total stations
-        half_edges = np.concatenate(([levels[0] - 0.5], levels + 0.5))
-        cmap = plt.get_cmap('Greys_r', len(levels))
-        norm = BoundaryNorm(half_edges, ncolors=cmap.N, clip=True)
-
-        pair_ax.imshow(n_stations[np.newaxis, :], aspect='auto', cmap=cmap, norm=norm,
-                       extent=[row_start, row_end, 0, 1])
-        pair_ax.set_yticks([])
-        pair_ax.set_xticks([])
-
-    # Label the x-axis on the bottom subplot only
-    axs[-1].set_xlabel('UTC Time')#,fontsize=14)
-
-    # add colorbar
-    cbar = fig.colorbar(mesh, ax=axs, orientation='vertical', fraction=0.05, pad=0.05)
-    cbar.set_label("Median Network Mag$^2$ Coherence")
-
-    # add colorbar for number of contributing pairs
-    sm = ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=2, vmax=data.nStations))
-    sm.set_array([])  # Required for colorbar
-    cbar_ax = fig.add_axes([0.04, 0.94, 0.2, 0.015])  # Position: left, top, width, height
-    cbar = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal',
-                boundaries=half_edges, ticks=levels, spacing='uniform')
-    cbar.set_label('# of Contributing Stations')
-
+    # --- title ---
     fig.suptitle(
-        f"{data.source_name} Median Network Coherence, {data.channel_str} channel"
-        f"\nStations: {data.station_names}", y=0.95)
+        f"{data.source_name} Median {data.label} Coherence, {data.channel_str} channel"
+        f"\n{data.sub_label}: {data.station_names}", y=0.95
+    )
 
     if save:
         plt.savefig(f"{save_dir}.jpg", dpi=300)
 
     plt.show()
+    return fig, ax
 
-    return fig, axs
 
 
 def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
-
     station_distances = []
     for tr in st:
+        if data.source_lat == None and data.source_lon == None:  # Do this for arrays so we sort by distance from element 1
+            data.source_lat = tr.stats.latitude
+            data.source_lon = tr.stats.longitude
+            data.source_name = tr.stats.station
         # find distance from source to each station
         dist_m, _, _ = gps2dist_azimuth(data.source_lat, data.source_lon, tr.stats.latitude, tr.stats.longitude)
         station_distances.append((tr.stats.station, dist_m))  # store station name and distance
@@ -126,7 +144,7 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     c_lim = [0.4, 1.0]
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
-    plt.subplots_adjust(left=0.07, bottom=0.09, hspace=0.1, top=0.95, wspace=0.1)
+    plt.subplots_adjust(left=0.08, bottom=0.09, hspace=0.1, top=0.95, wspace=0.1)
 
     ct = 0
     for i in range(0, N - 1):
@@ -196,7 +214,7 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     fig.text(0.30, 0.55, f'Increasing distance from {data.source_name} --------------->',
              ha='center', va='center', fontsize=16, rotation=45)
 
-    plt.suptitle(f"{data.source_name} inter-station coherence contributions"
+    plt.suptitle(f"{data.source_name} inter-{data.sub_label[:-1]} coherence contributions"
                  f"\n{data.starttime.year}-{data.starttime.month}-{data.starttime.day} to {data.endtime.month}-{data.endtime.day}",
                  fontsize=18)
 
