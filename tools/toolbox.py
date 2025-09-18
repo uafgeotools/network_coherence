@@ -349,4 +349,4 @@ def get_all_spectrograms(st, window_length, window_overlap, n_jobs=1):
 
     spectrograms = {station: spec for station, spec in results}
 
-    return spectrograms
+    return spectrograms, data
