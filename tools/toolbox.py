@@ -31,7 +31,7 @@ def remove_network_response(st, inv, type='full'):
                 tr.remove_response(inventory=inv, pre_filt=pre_filt, output='VEL', water_level=None)
             else:
                 # water level hardcoded for seismic
-                tr.remove_response(inventory=inv, pre_filt=pre_filt, output='DISP', water_level=60)
+                tr.remove_response(inventory=inv, pre_filt=pre_filt, output='VEL', water_level=60)
     else:
         print("Starting sensitivity removal.")
         st.remove_sensitivity(inv)

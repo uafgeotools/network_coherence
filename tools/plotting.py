@@ -7,7 +7,7 @@ import matplotlib.dates as dates
 from matplotlib import rcParams
 import matplotlib as mpl
 mpl.use('Qt5Agg')
-rcParams.update({'font.size': 14,'axes.labelsize': 16, 'axes.titlesize': 14,})
+rcParams.update({'font.size': 18,'axes.labelsize': 20, 'axes.titlesize': 14,})
 
 import matplotlib.pyplot as plt
 import matplotlib.dates as dates
@@ -16,7 +16,7 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LinearSegmentedColormap
 
-def plot_network_coherence(Cxy2_norm, data, save_dir, save=False, cmin=0.4, cmax=1):
+def plot_network_coherence(Cxy2_norm, data, cmin=0.4, cmax=1):
     # --- colormap for coherence ---
     colorm = LinearSegmentedColormap.from_list(
         '', ['white', *plt.get_cmap('magma_r').colors]
@@ -45,7 +45,7 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False, cmin=0.4, cmax
     ax.set_ylabel('Frequency [Hz]')
 
     # x-axis formatting
-    x_ticks = np.linspace(data.starttime.matplotlib_date, data.endtime.matplotlib_date, 6)
+    x_ticks = np.linspace(data.starttime.matplotlib_date, data.endtime.matplotlib_date, 5)
     ax.set_xticks(x_ticks)
     ax.xaxis_date()
     if data.n_days <= 1:
@@ -111,21 +111,12 @@ def plot_network_coherence(Cxy2_norm, data, save_dir, save=False, cmin=0.4, cmax
     cbar2.set_ticklabels([str(v) for v in values])
     cbar2.set_label(f'# of Contributing {data.sub_label}')
 
-    # --- title ---
-    fig.suptitle(
-        f"{data.source_name} Median {data.label} Coherence, {data.channel_str} channel"
-        f"\n{data.sub_label}: {data.station_names}", y=0.95
-    )
-
-    if save:
-        plt.savefig(f"{save_dir}.jpg", dpi=300)
-
     plt.show()
     return fig, ax
 
 
 
-def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
+def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
     station_distances = []
     for tr in st:
         if data.source_lat == None and data.source_lon == None:  # Do this for arrays so we sort by distance from element 1
@@ -141,7 +132,7 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     N = len(stations_sorted_asc)
 
     colorm = LinearSegmentedColormap.from_list('', ['white', *plt.get_cmap('magma_r').colors])
-    c_lim = [0.4, 1.0]
+    c_lim = [cmin, 1.0]
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
     plt.subplots_adjust(left=0.08, bottom=0.09, hspace=0.1, top=0.95, wspace=0.1)
@@ -213,13 +204,6 @@ def plot_interstation_coherence(coherograms, st, data, save_dir, save=False):
     # add overarching y-axis label
     fig.text(0.30, 0.55, f'Increasing distance from {data.source_name} --------------->',
              ha='center', va='center', fontsize=16, rotation=45)
-
-    plt.suptitle(f"{data.source_name} inter-{data.sub_label[:-1]} coherence contributions"
-                 f"\n{data.starttime.year}-{data.starttime.month}-{data.starttime.day} to {data.endtime.month}-{data.endtime.day}",
-                 fontsize=18)
-
-    if save:
-        plt.savefig(f"{save_dir}.jpg", dpi=300)
 
     plt.show()
 
