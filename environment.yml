@@ -1,0 +1,1 @@
+name: network_coherence_envchannels:  - conda-forge  - defaultsdependencies:  - obspy  - numba  - pyproj  - colorcet  - multiprocess  - tqdm  - cartopy  - pip  - rioxarray  - pip:    - git+https://github.com/uafgeotools/waveform_collection.git    - git+https://github.com/uafgeotools/rtm.git

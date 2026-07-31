@@ -14,7 +14,7 @@ from pyproj import CRS, Transformer
 import cartopy.crs as ccrs
 import colorcet as cc
 
-def plot_network_coherence(Cxy2_norm, data, cmin=0.4, cmax=1):
+def plot_network_coherence(Cxy2_net, data, cmin=0.4, cmax=1):
     # --- colormap for coherence ---
     colorm = LinearSegmentedColormap.from_list(
         '', ['white', *plt.get_cmap('magma_r').colors]
@@ -26,17 +26,13 @@ def plot_network_coherence(Cxy2_norm, data, cmin=0.4, cmax=1):
     plt.subplots_adjust(left=0.06, right=0.94, bottom=0.1, top=0.86)
 
     # --- main coherence image ---
-    mesh = ax.imshow(
-        Cxy2_norm,
-        aspect='auto',
-        cmap=colorm,
-        origin='lower',
-        extent=[data.starttime.matplotlib_date,
-                data.endtime.matplotlib_date,
-                data.freq_vector[0],
-                data.freq_vector[-1]],
-        interpolation='none'
-    )
+    mesh = ax.imshow(Cxy2_net, aspect='auto', cmap=colorm, origin='lower',
+                     extent=[data.starttime.matplotlib_date,
+                             data.endtime.matplotlib_date,
+                             data.freq_vector[0],
+                             data.freq_vector[-1]],
+                     interpolation='none')
+    
     mesh.set_clim(c_lim)
     ax.set_ylim(data.freq_min, data.freq_max)
     ax.set_xlim(data.starttime.matplotlib_date, data.endtime.matplotlib_date)
@@ -54,15 +50,11 @@ def plot_network_coherence(Cxy2_norm, data, cmin=0.4, cmax=1):
     ax.grid(alpha=0.8)
 
     # --- median strip (right side) ---
-    median_strip = get_median_strip(Cxy2_norm, data, fbin=0.1)
+    median_strip = get_median_strip(Cxy2_net, data, fbin=0.1)
     strip_ax = ax.inset_axes([1.0, 0, 0.03, 1], transform=ax.transAxes)
-    median_mesh = strip_ax.imshow(
-        median_strip,
-        aspect='auto',
-        cmap=colorm,
-        origin='lower',
-        interpolation='none'
-    )
+    median_mesh = strip_ax.imshow(median_strip, aspect='auto', cmap=colorm,
+                                  origin='lower', interpolation='none')
+    
     median_mesh.set_clim(c_lim)
     strip_ax.set_xticks([])
     strip_ax.set_yticks([])
@@ -84,12 +76,13 @@ def plot_network_coherence(Cxy2_norm, data, cmin=0.4, cmax=1):
         mapped[n_stations == v] = i
 
     pair_ax = ax.inset_axes([0, 1, 1, 0.02], transform=ax.transAxes)
-    pair_ax.imshow(mapped[np.newaxis, :],
-                   aspect='auto',
-                   cmap=greys_cmap, norm=grey_norm,
+    pair_ax.imshow(mapped[np.newaxis, :], aspect='auto', cmap=greys_cmap, norm=grey_norm,
                    extent=[data.starttime.matplotlib_date,
-                           data.endtime.matplotlib_date, 0, 1],
+                           data.endtime.matplotlib_date,
+                           0,
+                           1],
                    origin='lower', interpolation='nearest')
+    
     pair_ax.set_yticks([])
     pair_ax.set_xticks([])
 
@@ -121,6 +114,7 @@ def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
             data.source_lat = tr.stats.latitude
             data.source_lon = tr.stats.longitude
             data.source_name = tr.stats.station
+            
         # find distance from source to each station
         dist_m, _, _ = gps2dist_azimuth(data.source_lat, data.source_lon, tr.stats.latitude, tr.stats.longitude)
         station_distances.append((tr.stats.station, dist_m))  # store station name and distance
@@ -135,7 +129,6 @@ def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
     plt.subplots_adjust(left=0.08, bottom=0.09, hspace=0.1, top=0.95, wspace=0.1)
 
-    ct = 0
     for i in range(0, N - 1):
         for j in range(0, N - 1):
             ax = axs[i, j]  # select correct axis
@@ -156,29 +149,16 @@ def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
             elif (station_x, station_y) in coherograms:
                 coherogram = coherograms[(station_x, station_y)]
 
-
-            coherogram_with_strip, extended_t = add_median_strip(coherogram, 
-                                                                 data,
-                                                                 fbin=0.5, 
-                                                                 thickness=15)
-
             # now plot
-            mesh = ax.imshow(coherogram_with_strip, aspect='auto', cmap=colorm,
-                             origin='lower',
-                             extent=[extended_t[0], extended_t[-1],
+            mesh = ax.imshow(coherogram, aspect='auto', cmap=colorm, origin='lower',
+                             extent=[data.t[0],
+                                     data.t[-1],
                                      data.freq_vector[0],
                                      data.freq_vector[-1]],
                              interpolation='none')
 
             mesh.set_clim(c_lim)
             ax.set_ylim(data.freq_min, data.freq_max)
-
-            # label the lowermost left panel only
-            if i == N - 2 and j == 0:
-                print("Adding median strip label")
-                ax.text(1, 1.03, 'Median', color='black', fontsize=10,
-                        ha='center', va='center', rotation=0,
-                        transform=ax.transAxes)
 
             # add time ticks
             ax.xaxis_date()
@@ -252,13 +232,11 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
             # now plot the main imshow
 
             coherogram = np.clip(coherogram, 0, 1)
-            mesh = ax.imshow(phase_mat, aspect='auto', cmap=colorm,
-                             origin='lower',
+            mesh = ax.imshow(phase_mat, aspect='auto', cmap=colorm, origin='lower',
                              extent=[data.t[0], data.t[-1],
                                      data.freq_vector[0],
                                      data.freq_vector[-1]],
                              interpolation='none', alpha=coherogram)
-
 
             ax.set_ylim(data.freq_min, data.freq_max)
 
@@ -284,10 +262,13 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
 
             pos = ax.get_position()
             right_ax = fig.add_axes([pos.x1 + 0.001, pos.y0, 0.01, pos.height])
-            mesh_bar = right_ax.imshow(phi_reshaped, aspect='auto', cmap=colorm,
-                                       origin='lower',
-                                       extent=[0, 1, data.freq_min, data.freq_max],
-                                       interpolation='none', vmin=-np.pi, vmax=np.pi, alpha=coh_reshaped)
+            right_ax.imshow(phi_reshaped, aspect='auto', cmap=colorm, origin='lower',
+                                       extent=[0,
+                                               1,
+                                               data.freq_min,
+                                               data.freq_max],
+                                       interpolation='none', vmin=-np.pi,
+                                       vmax=np.pi, alpha=coh_reshaped)
             right_ax.set_xlim(0, 1)
             right_ax.set_ylim(data.freq_min, data.freq_max)
             right_ax.set_xticks([])
@@ -301,10 +282,10 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
     cbar.set_ticklabels([r'$-\pi$', r'$-\frac{\pi}{2}$', '0', r'$\frac{\pi}{2}$', r'$\pi$'], fontsize=16)
 
     # add overarching x-axis label
-    fig.text(0.5, 0.02, f'Increasing distance from grid center --------------->',
+    fig.text(0.5, 0.02, 'Increasing distance from grid center --------------->',
              ha='center', va='center', fontsize=16)
     # add overarching y-axis label
-    fig.text(0.30, 0.55, f'Increasing distance from grid center --------------->',
+    fig.text(0.30, 0.55, 'Increasing distance from grid center --------------->',
              ha='center', va='center', fontsize=16, rotation=45)
 
     starttime = st[0].stats.starttime
@@ -317,67 +298,6 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
     plt.show()
 
     return fig, axs
-
-
-def add_median_strip(coherogram, data, fbin=0.5, thickness=15):
-    """
-    Add the median strip to the coherogram
-    :param coherogram - 2D array of coherence values
-    :param data: data object containing frequency vector and time vector
-    :param fbin: frequency bin size, default is 0.5 Hz
-    :param thickness: thickness of the median strip, default is 15 pixels
-    :return: coherogram with median strip, extended time vector
-    """
-
-    # Create frequency z bins
-    bin_edges = np.arange(data.freq_vector[0],
-                          data.freq_vector[-1] + fbin, fbin)
-
-    # Compute median coherence per bin
-    bin_centers = []
-    bin_medians = []
-
-    for ii in range(len(bin_edges) - 1):
-        f_start = bin_edges[ii]
-        f_end = bin_edges[ii + 1]
-
-        # Find frequency indices in this bin
-        bin_indices = np.where((data.freq_vector >= f_start) & (
-                data.freq_vector < f_end))[0]
-
-        if len(bin_indices) > 0:
-            subset = coherogram[bin_indices, :]
-            median_val = np.median(subset)
-            bin_centers.append((f_start + f_end) / 2)
-            bin_medians.append(median_val)
-
-    bin_centers = np.array(bin_centers)
-    bin_medians = np.array(bin_medians)
-
-    # Create thicker median strip (e.g., 10 pixels wide). Might need
-    # to adjust this based on the size of the figure?
-    median_strip = np.full((len(data.freq_vector), thickness), np.nan)
-
-    # Fill each 0.5 Hz bin row with its median value across the width
-    for ii in range(len(bin_edges) - 1):
-        f_start = bin_edges[ii]
-        f_end = bin_edges[ii + 1]
-
-        bin_indices = np.where((data.freq_vector >= f_start) & (
-                data.freq_vector < f_end))[0]
-
-        if len(bin_indices) > 0:
-            median_strip[bin_indices, :] = bin_medians[ii]
-
-    # Combine with original coherogram
-    coherogram_with_strip = np.hstack([coherogram, median_strip])
-
-    # Extend time axis to reflect new column
-    dt = data.t[1] - data.t[0]
-    extended_t = np.append(data.t, data.t[-1] + dt)
-
-    return coherogram_with_strip, extended_t
-
 
 def get_median_strip(coherogram, data, fbin=0.5):
     # Compute median along each row
@@ -406,16 +326,6 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
                     hires=False):
     """
     Plot the 2D phase misfit grid produced by grid_search_phase().
-
-    Args:
-        S (xarray.DataArray): 2D phase misfit grid (y, x)
-        st (obspy.Stream): Station metadata (locations for plotting)
-        dem (xarray.DataArray, optional): DEM grid for contours
-        label_stations (bool): Label stations on plot
-        cont_int (float): Interval [m] between DEM contour lines
-        annot_int (float): Interval [m] for labeled DEM contours
-        xy_grid (float, optional): If provided, convert UTM coords so center is (0,0)
-        hires (bool): If True, use higher-res coastlines
     """
     st = st.copy()
     plt.rcParams.update({'font.size': 13})
@@ -460,6 +370,8 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
             standard_parallels=(S.y.values.min(), S.y.values.max())
         )
         transform = ccrs.PlateCarree()
+        best_lon = x_best_val
+        best_lat = y_best_val
 
     # Create figure with two panels
     fig, (ax_main, ax_zoom) = plt.subplots(1, 2, figsize=(16, 8),
@@ -588,7 +500,7 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
 
     # Plot phase misfit grid - zoom
     if S.UTM:
-        sm_zoom = S_zoom.plot.imshow(ax=ax_zoom, cmap=cmap, alpha=alpha_data_zoom, add_colorbar=False, vmin=vmin,
+        S_zoom.plot.imshow(ax=ax_zoom, cmap=cmap, alpha=alpha_data_zoom, add_colorbar=False, vmin=vmin,
                                      vmax=vmax)
         if xy_grid:
             ax_zoom.set_xlabel('X [m]')
@@ -598,7 +510,7 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
             ax_zoom.set_ylabel('UTM northing [m]')
             ax_zoom.ticklabel_format(style='plain', useOffset=False)
     else:
-        sm_zoom = S_zoom.plot.pcolormesh(ax=ax_zoom, transform=transform, cmap=cmap, alpha=alpha, add_colorbar=False,
+        S_zoom.plot.pcolormesh(ax=ax_zoom, transform=transform, cmap=cmap, alpha=alpha, add_colorbar=False,
                                          vmin=vmin, vmax=vmax)
 
     # Set zoom extent (for cartopy, after plotting)
@@ -612,8 +524,8 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
     from matplotlib.patches import Rectangle
     zoom_width = zoom_xmax - zoom_xmin
     zoom_height = zoom_ymax - zoom_ymin
-    rect = Rectangle((zoom_xmin, zoom_ymin), zoom_width, zoom_height,
-                     edgecolor='black', facecolor='none', linewidth=1.2, transform=plot_transform_main)
+    rect = Rectangle((zoom_xmin, zoom_ymin), zoom_width, zoom_height, edgecolor='black',
+                     facecolor='none', linewidth=1.2, transform=plot_transform_main)
     ax_main.add_patch(rect)
 
     # Initialize list of handles for legend (only on main)
@@ -679,42 +591,29 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
         ax_zoom.set_xlabel('Longitude')
         ax_zoom.set_ylabel('Latitude')
 
-    ax_main.text(
-        0.02,
-        0.95,
-        "a)",
-        transform=ax_main.transAxes,
-        fontweight="bold", fontsize=14,
-        bbox=dict(facecolor="white", alpha=0.7),
-    )
-
-    ax_zoom.text(
-        0.02,
-        0.95,
-        "b)",
-        transform=ax_zoom.transAxes,
-        fontweight="bold", fontsize=14,
-        bbox=dict(facecolor="white", alpha=0.7),
-    )
+    ax_main.text(0.02, 0.95, "a)", transform=ax_main.transAxes, fontweight="bold",
+                 fontsize=14, bbox=dict(facecolor="white", alpha=0.7))
+    ax_zoom.text(0.02, 0.95, "b)", transform=ax_zoom.transAxes, fontweight="bold",
+                 fontsize=14, bbox=dict(facecolor="white", alpha=0.7))
+    
+    ax_zoom.text(0.97, 0.97, f"Best fit\nLat: {best_lat:.5f}\nLon: {best_lon:.5f}",
+                 transform=ax_zoom.transAxes, ha="right", va="top", fontsize=16,
+                 bbox=dict(facecolor="lightgrey", edgecolor="black", alpha=0.8))
+    
+    ax_main.grid(alpha=0.5)
+    ax_zoom.grid(alpha=0.5)
 
     # Add shared colorbar on the right
     fig.subplots_adjust(right=0.86, left=0.065, top=0.98, bottom=0.05)
     pos = ax_zoom.get_position()
 
-    cax = fig.add_axes([
-        pos.x1 + 0.01,  # small gap to the right
-        pos.y0,  # same bottom
-        0.02,  # colorbar width
-        pos.height  # same height
-    ])
-    cbar = fig.colorbar(sm_main, cax=cax,
-                        label='Mean phase misfit [radians]')
+    cax = fig.add_axes([pos.x1 + 0.01, pos.y0, 0.02, pos.height])
+    cbar = fig.colorbar(sm_main, cax=cax, label='Mean phase misfit [radians]')
     cbar.solids.set_alpha(1)
 
     if xy_grid:
         ax_main.set_xlim(-xy_grid, xy_grid)
         ax_main.set_ylim(-xy_grid, xy_grid)
-        # Zoom limits already set
 
     plt.show()
 
