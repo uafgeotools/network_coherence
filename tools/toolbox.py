@@ -305,7 +305,7 @@ def compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5):
     """
         Computes the coherence-weighted circular mean phase (phi_obs)
         and the per-frequency average coherence (coh_avg) for each station-pair.
-        Return also the final weighting vector coh_weight = coh_avg used in the grid-search misfit.
+        Return also the final weighting vector used in the grid-search misfit.
     """
     # First, we create a frequency vector corresponding to the analysis band selected
     freq_mask = (data.freq_vector >= data.freq_min) & (data.freq_vector <= data.freq_max)
