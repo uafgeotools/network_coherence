@@ -1,11 +1,10 @@
-# IMPORTS
 from obspy import UTCDateTime
 from waveform_collection import gather_waveforms_bulk
 from rtm import (define_grid, produce_dem)
 from tools import toolbox, plotting
 
 #%% Define
-DEM_FILE = None  # optional DEM file for 3d distance calculations
+DEM_FILE = None  # optional path to DEM file for 3d distance calculations
 
 LAT_0 = 64.866   # [deg] Latitude of grid center
 LON_0 = -147.857  # [deg] Longitude of grid center
@@ -37,7 +36,6 @@ FREQ_MIN = 1.8  # [Hz] Lower cutoff frequency for phase calculation
 FREQ_MAX = 2.6  # [Hz] Upper cutoff frequency for phase calculation
 
 # Data collection parameters
-SOURCE = 'IRIS'
 NETWORK = '*'
 STATION = '*'
 LOCATION = '*'
@@ -58,7 +56,7 @@ if len({tr.stats.sampling_rate for tr in st}) > 1:  # if more than one sample ra
 
 #%% Compute inter-station phase, coherence, and network coherence
 phase_pairs, coherence_pairs, network_coherence, data = toolbox.get_interstation_phase_and_coherence(st, window_length=WINDOW_LENGTH,
-                                                           window_overlap=WINDOW_OVERLAP, n_jobs=4) # Here n_jobs specifies the CPU cores used.
+                                                           window_overlap=WINDOW_OVERLAP, n_jobs=4) # change n_jobs to use additional/fewer CPU cores.
 data.freq_min, data.freq_max = FREQ_MIN, FREQ_MAX
 data.source_lat, data.source_lon = LAT_0, LON_0
 
@@ -69,10 +67,10 @@ phi_obs, coh_weight = toolbox.compute_phi_obs(phase_pairs, coherence_pairs, data
 fig_2, axs_2 = plotting.plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, st, data)
 
 #%% Run grid search
-acoustic_velocity = 335.75  # change this based on local sound speed, or infer.
+acoustic_velocity = 335.75  # [m/s] change this based on local sound speed, or infer.
 
-S = toolbox.grid_search_phase(st=st, grid=grid, phase_obs=phi_obs, coh_weight=coh_weight,
+S = toolbox.grid_search_phase(st=st, S=grid, phase_obs=phi_obs, coh_weight=coh_weight,
                               wave_velocity=acoustic_velocity, dem=dem, data=data)
 
-#%% Plot phase misfit grid
+#%% Plot phase misfit grid (best-fit lat/lon will be plotted on figure)
 fig_phase = plotting.plot_phase_grid(S, st, dem=dem, xy_grid=X_RADIUS, cont_int=25, annot_int=200) # contour and annotation intervals only show up if topographic DEM is present

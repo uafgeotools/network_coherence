@@ -2,7 +2,7 @@ import numpy as np
 from scipy.fft import rfftfreq
 
 class DataBin:
-    """DataBin class for windowing information for time-frequency analysis and plotting"""
+    """DataBin class with windowing information for time-frequency analysis and plotting"""
     def __init__(self, window_length, window_overlap):
         self.window_length = window_length
         self.window_overlap = window_overlap
@@ -10,15 +10,15 @@ class DataBin:
         self.n_station_contributions = None
 
     def build_data(self, st):
-        # Assumes all traces have the same sample rate and length
+        # assumes all traces have the same sample rate and length
         self.sampling_rate = st[0].stats.sampling_rate
         self.winlensamp = int(self.window_length * self.sampling_rate)  # noqa
-        # Sample increment (delta_t)
+        # sample increment (delta_t)
         self.sampinc = int((1 - self.window_overlap) * self.winlensamp) + 1
-        # Time intervals to window data
+        # time intervals to window data
         self.intervals = np.arange(0, len(st[0].data) - self.winlensamp, self.sampinc, dtype='int')  # noqa
         self.nits = len(self.intervals)
-        # Pull time vector from stream object
+        # pull time vector from stream object
         self.tvec = st[0].times('matplotlib')
 
         self.sub_window = int(np.round(self.winlensamp / 2))  # hardcoded to 2
@@ -44,16 +44,9 @@ class DataBin:
         self.starttime = starttime
         self.endtime = endtime
         self.n_days = (endtime - starttime) / 86400
-        self.n_weeks = self.n_days / 7
 
         self.source_name = source_name
         self.source_lat = source_lat
         self.source_lon = source_lon
 
-        if self.source_lon == None and self.source_lat == None:  # Assign array or network label
-            self.label = "Array"
-            self.sub_label = "Elements"
-        else:
-            self.label = "Network"
-            self.sub_label = "Stations"
 

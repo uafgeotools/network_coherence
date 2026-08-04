@@ -11,12 +11,12 @@ from scipy.signal import coherence, csd
 import multiprocess as mp
 from obspy.core import Stream
 
-def remove_network_response(st, inv, type='full'):
+def remove_network_response(st, inv, response_type='full'):
     """
         Removes the instrument response from the traces in the stream.
         Interpolates differing sample rates, if present.
     """
-    if type == 'full':
+    if response_type == 'full':
         print("Starting full response removal.")
         for tr in st:
             fs_resp = tr.stats.sampling_rate
@@ -47,7 +47,7 @@ def rotate_stations(st, inv, source_lat, source_lon, output='radial'):
     rotated_st = Stream() 
     for i in range(len(inv[0])):  # Do stream rotations towards inferred source location for each station
 
-        # Compute back azimuth from current station to inferred source
+        # compute back azimuth from current station to inferred source
         _, _, baz = gps2dist_azimuth(source_lat, source_lon, inv[0][i].latitude, inv[0][i].longitude)
 
         station_code = inv[0][i].code
@@ -57,9 +57,11 @@ def rotate_stations(st, inv, source_lat, source_lon, output='radial'):
         rotated_st += station_st
 
     if output == 'radial':
-        rotated_st = rotated_st.select(component='R')  # only keep radial component
+        rotated_st = rotated_st.select(component='R')
+    elif output == 'transverse':
+        rotated_st = rotated_st.select(component='T')
     else:
-         rotated_st = rotated_st.select(component='T')  # keep only transverse component
+        raise ValueError("output must be 'radial' or 'transverse'")
 
     return rotated_st
 
@@ -180,7 +182,7 @@ def get_interstation_coherograms(st, data, n_jobs=1):
     """
         Computes pairwise inter-station coherograms for all unique station pairs.
     """
-    progress_counter = mp.Value('i', 0)  # initialize counter for progress tracking
+    counter = mp.Value('i', 0)  # initialize counter for progress tracking
 
     # function to compute inter-station coherence for a single station pair
     def compute_interstation_Cxy2(args):
@@ -199,8 +201,8 @@ def get_interstation_coherograms(st, data, n_jobs=1):
         Cxy2_array = np.array(Cxy2_list).T
         station_pair = (st[i].stats.station, st[j].stats.station)
 
-        global progress_counter
-        progress_counter.value += 1  # increment progress counter
+        with progress_counter.get_lock():
+            progress_counter.value += 1
 
         return (station_pair, Cxy2_array)
 
@@ -212,8 +214,8 @@ def get_interstation_coherograms(st, data, n_jobs=1):
     nPairs = len(tasks)  # determine number of unique station pairs
     
     # start parallel processing
-    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(progress_counter,)) as pool:
-        monitor_thread = threading.Thread(target=monitor_progress, args=(nPairs, progress_counter))
+    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(counter,)) as pool:
+        monitor_thread = threading.Thread(target=monitor_progress, args=(nPairs, counter))
         monitor_thread.start()
         results = pool.map(compute_interstation_Cxy2, tasks)
         monitor_thread.join()
@@ -239,7 +241,7 @@ def get_interstation_phase_and_coherence(st, window_length, window_overlap, n_jo
         except Exception:
             data.t[jj] = np.nanmax(data.t)
 
-    progress_counter = mp.Value('i', 0)  # initialize counter for progress tracking
+    counter = mp.Value('i', 0)  # initialize counter for progress tracking
 
     # function to compute inter-station coherence for a single station pair
     def compute_interstation_phase_and_coherence(args):
@@ -270,8 +272,8 @@ def get_interstation_phase_and_coherence(st, window_length, window_overlap, n_jo
         coherence_array = np.array(coherence_list).T
         station_pair = (st[i].stats.station, st[j].stats.station)
 
-        global progress_counter
-        progress_counter.value += 1  # increment progress counter
+        with progress_counter.get_lock():
+            progress_counter.value += 1
 
         return (station_pair, phase_array, coherence_array)
 
@@ -284,8 +286,8 @@ def get_interstation_phase_and_coherence(st, window_length, window_overlap, n_jo
     nPairs = len(tasks)
 
     # start parallel processing
-    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(progress_counter,)) as pool:
-        monitor_thread = threading.Thread(target=monitor_progress, args=(nPairs, progress_counter))
+    with mp.Pool(processes=n_jobs, initializer=init_worker, initargs=(counter,)) as pool:
+        monitor_thread = threading.Thread(target=monitor_progress, args=(nPairs, counter))
         monitor_thread.start()
         results = pool.map(compute_interstation_phase_and_coherence, tasks)
         monitor_thread.join()
@@ -307,7 +309,7 @@ def compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5):
         and the per-frequency average coherence (coh_avg) for each station-pair.
         Return also the final weighting vector used in the grid-search misfit.
     """
-    # First, we create a frequency vector corresponding to the analysis band selected
+    # first, we create a frequency vector corresponding to the analysis band selected
     freq_mask = (data.freq_vector >= data.freq_min) & (data.freq_vector <= data.freq_max)
 
     P = len(data.pairs)  # number of station pairs
@@ -316,52 +318,49 @@ def compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5):
     phi_obs = np.zeros((P, F))  # observed phase vector for each pair
     coh_avg = np.zeros((P, F))  # mean coherence for each pair
 
-    # Loop over pairs and compute the weighted circular mean phase over time (for each frequency)
+    # loop over pairs and compute the weighted circular mean phase over time (for each frequency)
     for p, pair in enumerate(data.pairs):
         
-        # Extract phase and coherence for this pair in the frequency band of interest
+        # extract phase and coherence for this pair in the frequency band of interest
         phase = phase_pairs[pair][freq_mask]
         coh = coherence_pairs[pair][freq_mask]
 
-        # Weighted complex sum across time for each frequency
+        # weighted complex sum across time for each frequency
         weighted_sum = np.sum(coh * np.exp(1j * phase), axis=1)
         
         # sum the coherence across time for each frequency
         weight_total = np.sum(coh, axis=1)
         
-        # Circular mean phase = angle of weighted average
+        # circular mean phase = angle of weighted average
         phi = np.angle(weighted_sum / weight_total)
         phi_obs[p, :] = phi  # store the observed phase for this pair
 
-        # Also compute the mean coherence per freq across time
+        # also compute the mean coherence per freq across time
         mean_coh = np.mean(coh, axis=1)
         coh_avg[p, :] = mean_coh
 
 
     coh_weight = coh_avg  # can be **2
-    coh_weight[
-        coh_avg < coh_threshold] = 0.0  # apply threshold: If a frequency has little coherence, we don't even want to trust the circular mean phase.
+    coh_weight[coh_avg < coh_threshold] = 0.0  # apply threshold: If a frequency has little coherence, we don't even want to trust the circular mean phase.
 
     return phi_obs, coh_weight
 
-def grid_search_phase(st, grid, phase_obs, coh_weight, wave_velocity, dem, data):
+def grid_search_phase(st, S, phase_obs, coh_weight, wave_velocity, dem, data):
     """
         Perform a grid search over candidate source locations using phase misfit
         between observed and theoretical inter-station phase differences.
     """
 
-    S = grid
-
-    # Project stations in processed_st to UTM if necessary
-    if grid.UTM:
+    # project stations in processed_st to UTM if necessary
+    if S.UTM:
         for tr in st:
-            tr.stats.utm_x, tr.stats.utm_y = _project_station_to_utm(tr, grid)
-            tr.stats.utm_zone = grid.UTM['zone']
+            tr.stats.utm_x, tr.stats.utm_y = _project_station_to_utm(tr, S)
+            tr.stats.utm_zone = S.UTM['zone']
     
     # compute theoretical travel times via RTM function
-    travel_times = celerity_travel_time(grid, st, celerity=wave_velocity, dem=dem)
+    travel_times = celerity_travel_time(S, st, celerity=wave_velocity, dem=dem)
 
-    # Store celerity in S attributes
+    # store celerity in S attributes
     S.attrs['celerity'] = wave_velocity
 
     print('----------------------')
@@ -369,7 +368,7 @@ def grid_search_phase(st, grid, phase_obs, coh_weight, wave_velocity, dem, data)
     print('(Numba-accelerated)')
     print('----------------------')
 
-    # Frequency vector and omega for the band of interest
+    # frequency vector and omega for the band of interest
     freq_mask = (
         (data.freq_vector >= data.freq_min) &
         (data.freq_vector <= data.freq_max)
@@ -377,7 +376,7 @@ def grid_search_phase(st, grid, phase_obs, coh_weight, wave_velocity, dem, data)
     f_band = data.freq_vector[freq_mask]
     omega = 2.0 * np.pi * f_band
 
-    # Precompute mapping from pair -> station indices
+    # precompute mapping from pair -> station indices
     idx0 = np.array([
         next(i for i, tr in enumerate(st) if tr.stats.station == p[0])
         for p in data.pairs
@@ -389,13 +388,11 @@ def grid_search_phase(st, grid, phase_obs, coh_weight, wave_velocity, dem, data)
 
     tic = time.time()
 
-    travel_times_data = travel_times.data
-
-    # Compute misfit grid 
-    misfit_grid = compute_phase_misfit_grid(travel_times_data, idx0, idx1,
+    # compute misfit grid 
+    misfit_grid = compute_phase_misfit_grid(travel_times.data, idx0, idx1,
                                             omega, phase_obs, coh_weight)
 
-    # Assign result back to xarray grid
+    # assign result back to xarray grid
     S.data = misfit_grid
 
     toc = time.time()
@@ -409,7 +406,7 @@ def compute_phase_misfit_grid(travel_times, idx0, idx1, omega, phase_obs, coh_we
         Computes the phase-misfit value at each grid point using precomputed travel
         times, station-pair indices, observed phase, and coherence weights.
     """
-    n_stations, ny, nx = travel_times.shape
+    _, ny, nx = travel_times.shape
     n_pairs, n_freqs = phase_obs.shape
     misfit_grid = np.empty((ny, nx), dtype=np.float64)
 

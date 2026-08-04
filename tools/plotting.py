@@ -10,22 +10,22 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.cm import ScalarMappable
 from matplotlib.colors import LinearSegmentedColormap
 import matplotlib.patheffects as pe
+from matplotlib.patches import Rectangle
 from pyproj import CRS, Transformer
 import cartopy.crs as ccrs
 import colorcet as cc
 
 def plot_network_coherence(Cxy2_net, data, cmin=0.4, cmax=1):
-    # --- colormap for coherence ---
+    # colormap for coherence
     colorm = LinearSegmentedColormap.from_list(
         '', ['white', *plt.get_cmap('magma_r').colors]
     )
     c_lim = [cmin, cmax]
 
-    # --- figure and axis ---
     fig, ax = plt.subplots(figsize=(16, 10))
     plt.subplots_adjust(left=0.06, right=0.94, bottom=0.1, top=0.86)
 
-    # --- main coherence image ---
+    # main network coherence image
     mesh = ax.imshow(Cxy2_net, aspect='auto', cmap=colorm, origin='lower',
                      extent=[data.starttime.matplotlib_date,
                              data.endtime.matplotlib_date,
@@ -46,10 +46,10 @@ def plot_network_coherence(Cxy2_net, data, cmin=0.4, cmax=1):
         ax.xaxis.set_major_formatter(dates.DateFormatter('%m-%d %H:%M'))
     else:
         ax.xaxis.set_major_formatter(dates.DateFormatter('%Y-%m-%d %H'))
-    ax.tick_params(axis='x')
     ax.grid(alpha=0.8)
+    ax.set_xlabel('UTC Time')
 
-    # --- median strip (right side) ---
+    # median strip (right side)
     median_strip = get_median_strip(Cxy2_net, data, fbin=0.1)
     strip_ax = ax.inset_axes([1.0, 0, 0.03, 1], transform=ax.transAxes)
     median_mesh = strip_ax.imshow(median_strip, aspect='auto', cmap=colorm,
@@ -61,7 +61,7 @@ def plot_network_coherence(Cxy2_net, data, cmin=0.4, cmax=1):
     strip_ax.text(1, 1, 'Median', rotation=45, ha='center', va='bottom',
                   transform=strip_ax.transAxes)
 
-    # --- greyscale station counts strip (on top) ---
+    # greyscale station counts strip (on top)
     n_stations_total = int(getattr(data, 'nStations', 0) or 0)
     values = [0] + list(range(2, n_stations_total + 1))  # skip 1
     base_cmap = plt.get_cmap('Greys_r')
@@ -86,23 +86,21 @@ def plot_network_coherence(Cxy2_net, data, cmin=0.4, cmax=1):
     pair_ax.set_yticks([])
     pair_ax.set_xticks([])
 
-    # --- labels ---
-    ax.set_xlabel('UTC Time')
-
-    # --- coherence colorbar ---
+    # coherence colorbar
     cbar = fig.colorbar(mesh, ax=ax, orientation='vertical', fraction=0.05, pad=0.05)
-    cbar.set_label(f"Median {data.label} Mag$^2$ Coherence")
+    cbar.set_label("Median Network Mag$^2$ Coherence")
 
-    # --- station counts colorbar ---
+    # station counts colorbar
     sm = ScalarMappable(cmap=greys_cmap, norm=grey_norm)
     sm.set_array([])
     cbar_ax = fig.add_axes([0.03, 0.94, 0.2, 0.015])  # left, top, width, height
     cbar2 = fig.colorbar(sm, cax=cbar_ax, orientation='horizontal')
     cbar2.set_ticks(np.arange(len(values)))
     cbar2.set_ticklabels([str(v) for v in values])
-    cbar2.set_label(f'# of Contributing {data.sub_label}')
+    cbar2.set_label('# of Contributing Sensors/Stations')
 
     plt.show()
+    
     return fig, ax
 
 
@@ -110,11 +108,6 @@ def plot_network_coherence(Cxy2_net, data, cmin=0.4, cmax=1):
 def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
     station_distances = []
     for tr in st:
-        if data.source_lat == None and data.source_lon == None:  # Do this for arrays so we sort by distance from element 1
-            data.source_lat = tr.stats.latitude
-            data.source_lon = tr.stats.longitude
-            data.source_name = tr.stats.station
-            
         # find distance from source to each station
         dist_m, _, _ = gps2dist_azimuth(data.source_lat, data.source_lon, tr.stats.latitude, tr.stats.longitude)
         station_distances.append((tr.stats.station, dist_m))  # store station name and distance
@@ -164,16 +157,16 @@ def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
             ax.xaxis_date()
             ax.set_xticklabels([])
 
-            if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
+            if i == (N - 2) - j:
                 ax.set_ylabel(f"$\\bf{{{station_y}}}$\n {np.round(dist_y/1000,decimals=1)} km")
             else:
                 ax.set_yticks([])
 
-            if i == N - 2:  # set x-axis labels for bottom row only
+            if i == N - 2:
                 ax.set_xlabel(f"$\\bf{{{station_x}}}$\n {np.round(dist_x/1000, decimals=1)} km")
 
     cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.7])
-    cbar = fig.colorbar(mesh, cax=cbar_ax)  # add colorbar
+    cbar = fig.colorbar(mesh, cax=cbar_ax)
     cbar.set_label("Mag$^2$ Coherence", fontsize=16)
 
     # add overarching x-axis label
@@ -199,7 +192,7 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
 
     N = len(stations_sorted_asc)
 
-    colorm = 'twilight_shifted'  # colormap for phase
+    colorm = 'twilight_shifted'  # circular colormap for phase
 
     fig, axs = plt.subplots(N - 1, N - 1, figsize=(14, 12))
     plt.subplots_adjust(left=0.09, bottom=0.09, hspace=0.1, top=0.95, wspace=0.2, right=0.85)
@@ -244,15 +237,15 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
             ax.xaxis_date()
             ax.set_xticklabels([])
 
-            if i == (N - 2) - j:  # set y-axis station labels on the filled panels on the left
+            if i == (N - 2) - j:
                 ax.set_ylabel(f"$\\bf{{{station_y}}}$\n {np.round(dist_y/1000,decimals=1)} km")
             else:
                 ax.set_yticks([])
 
-            if i == N - 2:  # set x-axis labels for bottom row only
+            if i == N - 2:
                 ax.set_xlabel(f"$\\bf{{{station_x}}}$\n {np.round(dist_x/1000, decimals=1)} km")
 
-            # Add the phi_obs as a colored bar on the right
+            # add the phi_obs as a colored bar on the right
             p = data.pairs.index(pair_key)
             phi = phi_obs[p, :]
             coh_alpha = coh_weight[p, :]
@@ -300,24 +293,24 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
     return fig, axs
 
 def get_median_strip(coherogram, data, fbin=0.5):
-    # Compute median along each row
+    # compute median along each row
     medians = np.median(coherogram, axis=1)
 
-    # Determine the desired frequency bins based on the specified fbin size
+    # determine the desired frequency bins based on the specified fbin size
     min_freq = data.freq_min
     max_freq = data.freq_max
     desired_freqs = np.arange(min_freq, max_freq + fbin, fbin)
 
-    # Find indices for new frequency discretization
+    # find indices for new frequency discretization
     indices = []
     for f in desired_freqs:
         if f > max_freq:
             break
         idx = np.argmin(np.abs(data.freq_vector - f))
-        if idx not in indices:  # Avoid duplicates
+        if idx not in indices:  # avoid duplicates
             indices.append(idx)
 
-    # Return the medians at the selected indices
+    # return the medians at the selected indices
     return medians[indices].reshape(-1,1)
 
 
@@ -329,16 +322,17 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
     """
     st = st.copy()
     plt.rcParams.update({'font.size': 13})
-    # Get coordinates of grid minimum (best fit)
+    
+    # get coordinates of grid minimum (best fit)
     min_val = float(S.min().data)
     y_best, x_best = np.unravel_index(np.nanargmin(S.data), S.shape)
     x_best_val = S.x.values[x_best]
     y_best_val = S.y.values[y_best]
 
-    # Get grid center
+    # get grid center
     lon_0, lat_0 = S.grid_center
 
-    # Handle projections
+    # handle projections
     if S.UTM:
         projection = None
         transform = None
@@ -350,17 +344,15 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
                 tr.stats.latitude, tr.stats.longitude
             )
 
-        # Extract corresponding coordinates
-
+        # extract corresponding coordinates
         utm_zone = S.attrs['UTM']['zone']
         southern = S.attrs['UTM']['southern_hemisphere']
 
-        # 4️⃣ Construct CRS for the UTM zone
+        # construct CRS for the UTM zone
         epsg_code = 32700 + utm_zone if southern else 32600 + utm_zone
         utm_crs = CRS.from_epsg(epsg_code)
         geodetic_crs = CRS.from_epsg(4326)  # WGS84
 
-        # 5️⃣ Build transformer and convert
         transformer = Transformer.from_crs(utm_crs, geodetic_crs, always_xy=True)
         best_lon, best_lat = transformer.transform(x_best_val, y_best_val)
     else:
@@ -373,11 +365,9 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
         best_lon = x_best_val
         best_lat = y_best_val
 
-    # Create figure with two panels
-    fig, (ax_main, ax_zoom) = plt.subplots(1, 2, figsize=(16, 8),
-                                           subplot_kw=dict(projection=projection))
-
-    # Now define plot_transform after axes creation
+    # create figure with two panels
+    fig, (ax_main, ax_zoom) = plt.subplots(1, 2, figsize=(16, 8), subplot_kw=dict(projection=projection))
+    
     if S.UTM:
         plot_transform_main = ax_main.transData
         plot_transform_zoom = ax_zoom.transData
@@ -385,20 +375,20 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
         plot_transform_main = ccrs.PlateCarree()
         plot_transform_zoom = ccrs.PlateCarree()
 
-    # Compute zoom extent: 1/10th of main grid width, centered on best-fit
+    # compute zoom extent: 1/10th of main grid width, centered on best-fit
     main_width = min((S.x.max() - S.x.min()), (S.y.max() - S.y.min()))
-    zoom_half = main_width / 20  # half of 1/10th
+    zoom_half = main_width / 20 
     zoom_xmin = x_best_val - zoom_half
     zoom_xmax = x_best_val + zoom_half
     zoom_ymin = y_best_val - zoom_half
     zoom_ymax = y_best_val + zoom_half
 
-    # Slice for zoom
+    # slice for zoom
     S_zoom = S.sel(x=slice(zoom_xmin, zoom_xmax), y=slice(zoom_ymin, zoom_ymax))
     if dem is not None:
         dem_zoom = dem.sel(x=slice(zoom_xmin, zoom_xmax), y=slice(zoom_ymin, zoom_ymax))
 
-    # Convert UTM coordinates so center is (0,0) if requested (apply to both main and zoom)
+    # convert UTM coordinates so center is (0,0)
     if xy_grid and S.UTM:
         print(f'Converting to x/y grid, cropping {xy_grid:d} m from center')
         x0 = S.x.data.min() + S.x_radius
@@ -427,22 +417,20 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
         zoom_ymin -= y0
         zoom_ymax -= y0
 
-    # Plot DEM contours if available - main
+    # plot DEM contours if available for left panel
     if dem is not None:
-        # Rounding to nearest cont_int
+
         all_levels = np.arange(np.ceil(dem.min().data / cont_int),
                                np.floor(dem.max().data / cont_int) + 1) * cont_int
-        # Rounding to nearest annot_int
+
         annot_levels = np.arange(np.ceil(dem.min().data / annot_int),
                                  np.floor(dem.max().data / annot_int) + 1) * annot_int
-        # Ensure we don't draw annotated levels twice
+
         cont_levels = [lvl for lvl in all_levels if lvl not in annot_levels]
 
         dem.plot.contour(ax=ax_main, colors='k', levels=cont_levels, linewidths=0.3, zorder=-1)
         cs = dem.plot.contour(ax=ax_main, colors='k', levels=annot_levels, linewidths=0.7, zorder=-1)
         ax_main.clabel(cs, fontsize=9, fmt='%d', inline=True)
-
-        alpha = 0.55  # change this
 
         # Mask areas outside of DEM extent
         dem_slice = dem.sel(x=S.x, y=S.y, method='nearest')
@@ -450,16 +438,13 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
     else:
         if not S.UTM:
             _plot_geographic_context(ax=ax_main, hires=hires)
-            alpha = 0.5
-        else:
-            alpha = 1
 
-    # Plot phase misfit grid - main
+    # plot phase misfit grid for left panel
     cmap = cc.cm.fire
     vmin = float(S.min().data)
-    vmax = float(S.min().data + (S.max().data - S.min().data) * 0.5)  # using max as 3/4 for better contrast
-    alpha_data = 0.9 * (1.0 - (S.data - vmin) / (vmax - vmin + 1e-12))
-    alpha_data = np.clip(alpha_data, 0.05, 0.9)  # never fully transparent or >0.85
+    vmax = float(S.min().data + (S.max().data - S.min().data) * 0.5)  # using max as 1/2 for better contrast
+    alpha_data = 0.9 * (1.0 - (S.data - vmin) / (vmax - vmin + 1e-12)) # create transparency map to misfit values
+    alpha_data = np.clip(alpha_data, 0.05, 0.9)  # never fully transparent or >0.9, retains some transparency.
 
     alpha_data_zoom = 0.9 * (1.0 - (S_zoom.data - vmin) / (vmax - vmin + 1e-12))
     alpha_data_zoom = np.clip(alpha_data_zoom, 0.05, 0.9)
@@ -474,31 +459,30 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
             ax_main.set_ylabel('UTM northing [m]')
             ax_main.ticklabel_format(style='plain', useOffset=False)
     else:
-        sm_main = S.plot.pcolormesh(ax=ax_main, transform=transform, cmap=cmap, alpha=alpha, add_colorbar=False,
+        sm_main = S.plot.pcolormesh(ax=ax_main, transform=transform, cmap=cmap, alpha=alpha_data, add_colorbar=False,
                                     vmin=vmin, vmax=vmax)
 
-    # Plot DEM contours if available - zoom
+    # plot DEM contours if available for right panel
     if dem is not None:
         all_levels_zoom = np.arange(np.ceil(dem.min().data / (cont_int / 2)),
                                     np.floor(dem.max().data / (cont_int / 2)) + 1) * (cont_int / 2)
-        # Rounding to nearest annot_int
+        
         annot_levels_zoom = np.arange(np.ceil(dem.min().data / (annot_int / 2)),
                                       np.floor(dem.max().data / (annot_int / 2)) + 1) * (annot_int / 2)
-        # Ensure we don't draw annotated levels twice
+        
         cont_levels_zoom = [lvl for lvl in all_levels_zoom if lvl not in annot_levels_zoom]
 
         dem_zoom.plot.contour(ax=ax_zoom, colors='k', levels=cont_levels_zoom, linewidths=0.3, zorder=-1)
         cs_zoom = dem_zoom.plot.contour(ax=ax_zoom, colors='k', levels=annot_levels_zoom, linewidths=0.7, zorder=-1)
         ax_zoom.clabel(cs_zoom, fontsize=9, fmt='%d', inline=True)
 
-        # Mask for zoom
         dem_slice_zoom = dem_zoom.sel(x=S_zoom.x, y=S_zoom.y, method='nearest')
         S_zoom.data[np.isnan(dem_slice_zoom.data)] = np.nan
     else:
         if not S.UTM:
             _plot_geographic_context(ax=ax_zoom, hires=hires)
 
-    # Plot phase misfit grid - zoom
+    # plot phase misfit grid for right panel
     if S.UTM:
         S_zoom.plot.imshow(ax=ax_zoom, cmap=cmap, alpha=alpha_data_zoom, add_colorbar=False, vmin=vmin,
                                      vmax=vmax)
@@ -510,47 +494,45 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
             ax_zoom.set_ylabel('UTM northing [m]')
             ax_zoom.ticklabel_format(style='plain', useOffset=False)
     else:
-        S_zoom.plot.pcolormesh(ax=ax_zoom, transform=transform, cmap=cmap, alpha=alpha, add_colorbar=False,
+        S_zoom.plot.pcolormesh(ax=ax_zoom, transform=transform, cmap=cmap, alpha=alpha_data_zoom, add_colorbar=False,
                                          vmin=vmin, vmax=vmax)
 
-    # Set zoom extent (for cartopy, after plotting)
     if not S.UTM:
         ax_zoom.set_extent([zoom_xmin, zoom_xmax, zoom_ymin, zoom_ymax], crs=transform)
     else:
         ax_zoom.set_xlim(zoom_xmin, zoom_xmax)
         ax_zoom.set_ylim(zoom_ymin, zoom_ymax)
 
-    # Add black square on main plot showing zoom extent
-    from matplotlib.patches import Rectangle
+    # add black square on main plot showing zoom extent
     zoom_width = zoom_xmax - zoom_xmin
     zoom_height = zoom_ymax - zoom_ymin
     rect = Rectangle((zoom_xmin, zoom_ymin), zoom_width, zoom_height, edgecolor='black',
                      facecolor='none', linewidth=1.2, transform=plot_transform_main)
     ax_main.add_patch(rect)
 
-    # Initialize list of handles for legend (only on main)
+    # initialize list of handles for legend (only on main)
     scatter_zorder = 5
     h = [None, None, None]
 
-    # Plot grid center - both axes
+    # plot grid center for both axes
     ax_main.scatter(lon_0, lat_0, s=50, color='limegreen', edgecolor='black',
                     label='Grid center', transform=plot_transform_main, zorder=scatter_zorder)
     ax_zoom.scatter(lon_0, lat_0, s=50, color='limegreen', edgecolor='black',
                     label='Grid center', transform=plot_transform_zoom, zorder=scatter_zorder)
-    h[0] = ax_main.collections[-1]  # Get handle from main
+    h[0] = ax_main.collections[-1]
 
-    # Plot best-fit source (minimum misfit) - both
+    # plot best-fit source (minimum misfit) for both axes
     if S.UTM:
         label = 'Best fit'
     else:
         label = f'Best fit\n({y_best_val:.4f}, {x_best_val:.4f})'
     ax_main.scatter(x_best_val, y_best_val, s=150, color='white', marker='*',
                     edgecolor='black', label=label, transform=plot_transform_main, zorder=scatter_zorder)
-    ax_zoom.scatter(x_best_val, y_best_val, s=150, color='white', marker='*',
+    ax_zoom.scatter(x_best_val, y_best_val, s=200, color='white', marker='*',
                     edgecolor='black', label=label, transform=plot_transform_zoom, zorder=scatter_zorder)
     h[1] = ax_main.collections[-1]
 
-    # Plot stations - both
+    # plot stations on both axes
     for tr in st:
         ax_main.scatter(tr.stats.longitude, tr.stats.latitude, marker='v', color='orange',
                         edgecolor='black', label='Station', transform=plot_transform_main, zorder=scatter_zorder)
@@ -571,17 +553,18 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
                          zorder=scatter_zorder,
                          path_effects=[pe.Stroke(linewidth=2, foreground='black'), pe.Normal()],
                          clip_on=True)
-    h[2] = ax_main.collections[-1]  # Approximate handle
+    h[2] = ax_main.collections[-1]
 
-    # Legend only on main
+    # legend only on main
     ax_main.legend(h, [handle.get_label() for handle in h if handle is not None],
                    loc='lower left', framealpha=1, borderpad=0.3, handletextpad=0.3)
 
-    # Label and style
+    # add title
     title = f'Phase misfit grid\nMin misfit = {min_val:.3f} rad'
     if hasattr(S, 'celerity'):
         title += f'\nCelerity: {S.celerity:g} m/s'
-
+    ax_main.set_title(title)
+    
     if S.UTM:
         ax_main.set_aspect('equal')
         ax_zoom.set_aspect('equal')
@@ -595,7 +578,6 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
                  fontsize=14, bbox=dict(facecolor="white", alpha=0.7))
     ax_zoom.text(0.02, 0.95, "b)", transform=ax_zoom.transAxes, fontweight="bold",
                  fontsize=14, bbox=dict(facecolor="white", alpha=0.7))
-    
     ax_zoom.text(0.97, 0.97, f"Best fit\nLat: {best_lat:.5f}\nLon: {best_lon:.5f}",
                  transform=ax_zoom.transAxes, ha="right", va="top", fontsize=16,
                  bbox=dict(facecolor="lightgrey", edgecolor="black", alpha=0.8))
@@ -603,7 +585,7 @@ def plot_phase_grid(S, st, dem=None, label_stations=True,
     ax_main.grid(alpha=0.5)
     ax_zoom.grid(alpha=0.5)
 
-    # Add shared colorbar on the right
+    # add shared colorbar on the right
     fig.subplots_adjust(right=0.86, left=0.065, top=0.98, bottom=0.05)
     pos = ax_zoom.get_position()
 
