@@ -15,6 +15,7 @@ WINDOW_OVERLAP = 0.75
 
 # Apply median filter to coherograms
 MED_FILT = True
+KERNEL_SIZE = 5  # Kernel size, must be odd.
 
 # TIME, CHANNEL, AND SOURCE INFORMATION---------------------------------------------------------------------------------
 STARTTIME = UTCDateTime("2025-03-09T00:00:00")
@@ -24,11 +25,12 @@ ENDTIME = STARTTIME + ANALYSIS_LEN
 CHANNEL = "BHZ"  # select "*HZ" or "*HN, *HE" for vertical or horizontals, respectively
 
 SOURCE_NAME = "Spurr"
-SOURCE_LAT = 61.2989  # Source latitude (Spurr)
-SOURCE_LON = -152.2539  # Source longitude (Spurr)
+SOURCE_LAT = 61.2989  # Source latitude
+SOURCE_LON = -152.2539  # Source longitude
 
 MAX_RADIUS = 25  # max radius to search for stations [km]
 STATIONS_TO_REMOVE = ['N20K','SPCN']  # Remove these stations from the analysis
+
 #-----------------------------------------------------------------------------------------------------------------------
 #%% Get obspy stream and inventory for stations within our search
 client = Client("EARTHSCOPE")
@@ -39,7 +41,7 @@ inv = client.get_stations(latitude=SOURCE_LAT, longitude=SOURCE_LON,
                           endtime=ENDTIME, level="response")
 
 st = gather_waveforms_bulk(lon_0=SOURCE_LON, lat_0=SOURCE_LAT, max_radius=MAX_RADIUS, network='*',
-                           station='*', location='*', channel=CHANNEL, starttime=STARTTIME, endtime=ENDTIME, n_jobs=1) # change n_jobs to use additional CPU cores.
+                           station='*', location='*', channel=CHANNEL, starttime=STARTTIME, endtime=ENDTIME, n_jobs=4) # change n_jobs to use additional CPU cores.
 
 # Filter out bad stations from st and inv
 for remove in STATIONS_TO_REMOVE:
@@ -55,25 +57,25 @@ if st[0].stats.channel[1:] == 'HE' or st[0].stats.channel[1:] == 'HN':
 print(st)
 
 #%% Get median network coherence in parallel
-Cxy2_net, data = toolbox.get_network_coherence(st, WINDOW_LENGTH, WINDOW_OVERLAP, n_jobs=6)
+Cxy2_net, data = toolbox.get_network_coherence(st, WINDOW_LENGTH, WINDOW_OVERLAP, n_jobs=4)
 # Add plotting info to data class
 data.add_plotting_info(FREQ_MIN, FREQ_MAX, CHANNEL, STARTTIME, ENDTIME, SOURCE_NAME, SOURCE_LAT, SOURCE_LON)
 
 # Optional median filter smoothing of network coherogram
 if MED_FILT:
-    Cxy2_net= medfilt(Cxy2_net, kernel_size=(1, 5))
+    Cxy2_net= medfilt(Cxy2_net, kernel_size=(1, KERNEL_SIZE))
 
 #%% PLOTTING network coherogram
 fig, axs = plotting.plot_network_coherence(Cxy2_net, data, cmin=0.35)
 
 #%% Retrieve all station-pair coherograms in parallel
-coherograms = toolbox.get_interstation_coherograms(st, data, n_jobs=6)
+coherograms = toolbox.get_interstation_coherograms(st, data, n_jobs=4)
 
 # Optional median filter smoothed coherogram
 if MED_FILT:
     for sta1, sta2 in coherograms:
         coherogram = coherograms[(sta1, sta2)]
-        coherogram_smoothed = medfilt(coherogram, kernel_size=(1, 5))
+        coherogram_smoothed = medfilt(coherogram, kernel_size=(1, KERNEL_SIZE))
         coherograms[(sta1, sta2)] = coherogram_smoothed
 
 #%% PLOTTING Station-pair coherence contributions

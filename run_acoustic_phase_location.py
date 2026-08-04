@@ -14,14 +14,8 @@ X_RADIUS = 2400  # [m] E-W grid radius (half of grid "width")
 Y_RADIUS = 2400  # [m] N-S grid radius (half of grid "height")
 SPACING = 2  # Grid spacing [m]
 
-grid = define_grid(
-    lon_0=LON_0,
-    lat_0=LAT_0,
-    x_radius=X_RADIUS,
-    y_radius=Y_RADIUS,
-    spacing=SPACING,
-    projected=True,
-)
+grid = define_grid(lon_0=LON_0, lat_0=LAT_0, x_radius=X_RADIUS,
+                   y_radius=Y_RADIUS, spacing=SPACING, projected=True)
 
 if DEM_FILE:
     dem = produce_dem(grid, external_file=DEM_FILE)
@@ -64,12 +58,11 @@ if len({tr.stats.sampling_rate for tr in st}) > 1:  # if more than one sample ra
 
 #%% Compute inter-station phase, coherence, and network coherence
 phase_pairs, coherence_pairs, network_coherence, data = toolbox.get_interstation_phase_and_coherence(st, window_length=WINDOW_LENGTH,
-                                                           window_overlap=WINDOW_OVERLAP, n_jobs=1) # Here n_jobs specifies the CPU cores used.
+                                                           window_overlap=WINDOW_OVERLAP, n_jobs=4) # Here n_jobs specifies the CPU cores used.
 data.freq_min, data.freq_max = FREQ_MIN, FREQ_MAX
 data.source_lat, data.source_lon = LAT_0, LON_0
 
-# compute observed inter-station phases
-
+# compute observed inter-station phases and final coherence weighting
 phi_obs, coh_weight = toolbox.compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5) # Here coh_threshold is C_th from Eq. 7 in the manuscript, removing incoherent frequencies altogether.
 
 # Plot coherent inter-station phase
@@ -82,4 +75,4 @@ S = toolbox.grid_search_phase(st=st, grid=grid, phase_obs=phi_obs, coh_weight=co
                               wave_velocity=acoustic_velocity, dem=dem, data=data)
 
 #%% Plot phase misfit grid
-fig_phase = plotting.plot_phase_grid(S, st, dem=dem, xy_grid=X_RADIUS, cont_int=25, annot_int=200)
+fig_phase = plotting.plot_phase_grid(S, st, dem=dem, xy_grid=X_RADIUS, cont_int=25, annot_int=200) # contour and annotation intervals only show up if topographic DEM is present
