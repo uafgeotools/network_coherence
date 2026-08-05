@@ -50,8 +50,9 @@ for remove in STATIONS_TO_REMOVE:
 #%% Remove response, interpolate (if needed), and rotate if horizontals
 st = toolbox.remove_network_response(st, inv, response_type='sensitivity')  # other option 'full'
 
-if st[0].stats.channel[1:] == 'HE' or st[0].stats.channel[1:] == 'HN':
-    st = toolbox.rotate_stations(st, inv, SOURCE_LAT, SOURCE_LON, output='radial')  # rotate to radial or transverse
+if (any(tr.stats.channel[1:] == "HE" for tr in st) and any(tr.stats.channel[1:] == "HN" for tr in st)):
+    st = toolbox.rotate_stations(st, inv, SOURCE_LAT, SOURCE_LON, output="radial")
+
 print(st)
 
 #%% Get median network coherence
