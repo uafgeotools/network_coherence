@@ -61,7 +61,7 @@ data.freq_min, data.freq_max = FREQ_MIN, FREQ_MAX
 data.source_lat, data.source_lon = LAT_0, LON_0
 
 # compute observed inter-station phases and final coherence weighting
-phi_obs, coh_weight = toolbox.compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5) # Here coh_threshold is C_th from Eq. 7 in the manuscript, removing incoherent frequencies altogether.
+phi_obs, coh_weight = toolbox.compute_phi_obs(phase_pairs, coherence_pairs, data)
 
 # Plot coherent inter-station phase
 fig_2, axs_2 = plotting.plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, st, data)

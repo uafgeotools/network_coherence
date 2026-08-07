@@ -303,7 +303,7 @@ def get_interstation_phase_and_coherence(st, window_length, window_overlap, n_jo
     
     return phase_pairs, coherence_pairs, network_coherence, data
 
-def compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5):
+def compute_phi_obs(phase_pairs, coherence_pairs, data):
     """
         Computes the coherence-weighted circular mean phase (phi_obs)
         and the per-frequency average coherence (coh_avg) for each station-pair.
@@ -339,9 +339,7 @@ def compute_phi_obs(phase_pairs, coherence_pairs, data, coh_threshold=0.5):
         mean_coh = np.mean(coh, axis=1)
         coh_avg[p, :] = mean_coh
 
-
-    coh_weight = coh_avg  # can be **2
-    coh_weight[coh_avg < coh_threshold] = 0.0  # apply threshold: If a frequency has little coherence, we don't even want to trust the circular mean phase.
+    coh_weight = coh_avg
 
     return phi_obs, coh_weight
 
