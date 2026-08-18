@@ -60,16 +60,16 @@ phase_pairs, coherence_pairs, network_coherence, data = toolbox.get_interstation
 data.freq_min, data.freq_max = FREQ_MIN, FREQ_MAX
 data.source_lat, data.source_lon = LAT_0, LON_0
 
-# compute observed inter-station phases and final coherence weighting
-phi_obs, coh_weight = toolbox.compute_phi_obs(phase_pairs, coherence_pairs, data)
+# compute observed inter-station phases
+phi_obs = toolbox.compute_phi_obs(phase_pairs, coherence_pairs, data)
 
 # Plot coherent inter-station phase
-fig_2, axs_2 = plotting.plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, st, data)
+fig_2, axs_2 = plotting.plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, st, data)
 
 #%% Run grid search
 acoustic_velocity = 335.75  # [m/s] change this based on local sound speed, or infer.
 
-S = toolbox.grid_search_phase(st=st, S=grid, phase_obs=phi_obs, coh_weight=coh_weight,
+S = toolbox.grid_search_phase(st=st, S=grid, phase_obs=phi_obs,
                               wave_velocity=acoustic_velocity, dem=dem, data=data)
 
 #%% Plot phase misfit grid (best-fit lat/lon will be plotted on figure)

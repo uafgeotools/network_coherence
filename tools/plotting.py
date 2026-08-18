@@ -181,7 +181,7 @@ def plot_interstation_coherence(coherograms, st, data, cmin=0.4):
     return fig, axs
 
 
-def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, st, data):
+def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, st, data):
     station_distances = []
     for tr in st:
         # find distance from source to each station
@@ -248,10 +248,8 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
             # add the phi_obs as a colored bar on the right
             p = data.pairs.index(pair_key)
             phi = phi_obs[p, :]
-            coh_alpha = coh_weight[p, :]
 
             phi_reshaped = phi[:, np.newaxis]  # shape (F, 1)
-            coh_reshaped = coh_alpha[:, np.newaxis]
 
             pos = ax.get_position()
             right_ax = fig.add_axes([pos.x1 + 0.001, pos.y0, 0.01, pos.height])
@@ -260,8 +258,9 @@ def plot_interstation_phase(phase_pairs, coherence_pairs, phi_obs, coh_weight, s
                                                1,
                                                data.freq_min,
                                                data.freq_max],
-                                       interpolation='none', vmin=-np.pi,
-                                       vmax=np.pi, alpha=coh_reshaped)
+                                       interpolation='none',
+                                       vmin=-np.pi,
+                                       vmax=np.pi)
             right_ax.set_xlim(0, 1)
             right_ax.set_ylim(data.freq_min, data.freq_max)
             right_ax.set_xticks([])

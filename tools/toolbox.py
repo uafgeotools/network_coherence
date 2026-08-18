@@ -306,8 +306,7 @@ def get_interstation_phase_and_coherence(st, window_length, window_overlap, n_jo
 def compute_phi_obs(phase_pairs, coherence_pairs, data):
     """
         Computes the coherence-weighted circular mean phase (phi_obs)
-        and the per-frequency average coherence (coh_avg) for each station-pair.
-        Return also the final weighting vector used in the grid-search misfit.
+        for each station-pair.
     """
     # first, we create a frequency vector corresponding to the analysis band selected
     freq_mask = (data.freq_vector >= data.freq_min) & (data.freq_vector <= data.freq_max)
@@ -316,7 +315,6 @@ def compute_phi_obs(phase_pairs, coherence_pairs, data):
     F = np.count_nonzero(freq_mask)  # number of frequencies after masking
 
     phi_obs = np.zeros((P, F))  # observed phase vector for each pair
-    coh_avg = np.zeros((P, F))  # mean coherence for each pair
 
     # loop over pairs and compute the weighted circular mean phase over time (for each frequency)
     for p, pair in enumerate(data.pairs):
@@ -335,15 +333,9 @@ def compute_phi_obs(phase_pairs, coherence_pairs, data):
         phi = np.angle(weighted_sum / weight_total)
         phi_obs[p, :] = phi  # store the observed phase for this pair
 
-        # also compute the mean coherence per freq across time
-        mean_coh = np.mean(coh, axis=1)
-        coh_avg[p, :] = mean_coh
+    return phi_obs
 
-    coh_weight = coh_avg
-
-    return phi_obs, coh_weight
-
-def grid_search_phase(st, S, phase_obs, coh_weight, wave_velocity, dem, data):
+def grid_search_phase(st, S, phase_obs, wave_velocity, dem, data):
     """
         Perform a grid search over candidate source locations using phase misfit
         between observed and theoretical inter-station phase differences.
@@ -369,26 +361,24 @@ def grid_search_phase(st, S, phase_obs, coh_weight, wave_velocity, dem, data):
     # frequency vector and omega for the band of interest
     freq_mask = (
         (data.freq_vector >= data.freq_min) &
-        (data.freq_vector <= data.freq_max)
-    )
+        (data.freq_vector <= data.freq_max))
     f_band = data.freq_vector[freq_mask]
     omega = 2.0 * np.pi * f_band
 
     # precompute mapping from pair -> station indices
     idx0 = np.array([
         next(i for i, tr in enumerate(st) if tr.stats.station == p[0])
-        for p in data.pairs
-    ])
+        for p in data.pairs])
+    
     idx1 = np.array([
         next(i for i, tr in enumerate(st) if tr.stats.station == p[1])
-        for p in data.pairs
-    ])
+        for p in data.pairs])
 
     tic = time.time()
 
     # compute misfit grid 
     misfit_grid = compute_phase_misfit_grid(travel_times.data, idx0, idx1,
-                                            omega, phase_obs, coh_weight)
+                                            omega, phase_obs)
 
     # assign result back to xarray grid
     S.data = misfit_grid
@@ -399,13 +389,14 @@ def grid_search_phase(st, S, phase_obs, coh_weight, wave_velocity, dem, data):
     return S
 
 @njit(parallel=True, fastmath=True, nogil=True)
-def compute_phase_misfit_grid(travel_times, idx0, idx1, omega, phase_obs, coh_weight):
+def compute_phase_misfit_grid(travel_times, idx0, idx1, omega, phase_obs):
     """
         Computes the phase-misfit value at each grid point using precomputed travel
-        times, station-pair indices, observed phase, and coherence weights.
+        times, station-pair indices, and observed phase.
     """
     _, ny, nx = travel_times.shape
     n_pairs, n_freqs = phase_obs.shape
+    n_total = n_pairs * n_freqs
     misfit_grid = np.empty((ny, nx), dtype=np.float64)
 
     for i in prange(nx):  # parallelize outer loop
@@ -416,16 +407,14 @@ def compute_phase_misfit_grid(travel_times, idx0, idx1, omega, phase_obs, coh_we
             delta_t = t_all[idx0] - t_all[idx1]
 
             mean_misfit = 0.0
-            weight_sum = 0.0
             for p in range(n_pairs):
                 for f in range(n_freqs):
                     # theoretical phase for this pair and frequency
                     phi_theo = (delta_t[p] * omega[f]) % (2 * np.pi)
                     # circular difference between observed and theoretical phase
                     res = np.angle(np.exp(1j * (phase_obs[p, f] - phi_theo)))
-                    mean_misfit += coh_weight[p, f] * abs(res)
-                    weight_sum += coh_weight[p, f]
+                    mean_misfit += abs(res)
 
-            misfit_grid[j, i] = mean_misfit / weight_sum if weight_sum > 0 else np.nan
+            misfit_grid[j, i] = mean_misfit / n_total if n_total > 0 else np.nan
 
     return misfit_grid
