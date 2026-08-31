@@ -1,6 +1,6 @@
 # Network Coherence
 
-**Application of the Network Coherence technique to seismic/acoustic networks/arrays to detect weak but coherent seismoacoustic signals. Also included is code to locate non-impulsive acoustic sources using inter-element phase.**
+Application of the Network Coherence technique to seismic/acoustic networks/arrays to detect weak but coherent seismoacoustic signals. Also included is code to locate non-impulsive acoustic sources using inter-element phase. When using this code we ask you to cite the following paper, which also provides details on the method and some examples:
 
 Scamfer, L. T., Fee, D., Tan, D. (2026). *Analyzing Seismic and Acoustic Signals with Network-based Coherence and Phase*. *The Seismic Record*
 
