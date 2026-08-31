@@ -48,3 +48,7 @@ See the included examples:
 
 David Fee
 Logan T. Scamfer
+
+## Acknowledgements and Distribution Statement
+
+This work was supported by the Defense Threat Reduction Agency Nuclear Arms Control Technology program under Contract Number HDTRA121C0030 (Distribution statement: Cleared for release).
