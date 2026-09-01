@@ -47,6 +47,7 @@ See the included examples:
 *(Alphabetical order by last name.)*
 
 David Fee
+
 Logan T. Scamfer
 
 ## Acknowledgements and Distribution Statement
